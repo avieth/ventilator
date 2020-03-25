@@ -53,7 +53,7 @@ $ cabal new-run
 $ cd ../cbits
 $ cp ../spec/ventilator.c ../spec/ventilator.h ./
 $ gcc -c ventilator.c
-$ gcc main.c ventilator.o -lncurses -o ventilator
+$ gcc main.c ventilator.o -lncurses -lm -o ventilator
 
 # Run the simulation
 ./ventilator
