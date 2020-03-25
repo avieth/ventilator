@@ -8,12 +8,13 @@ module Controls
   , error_controls
 
   , bpm_limited
-  , volume_limit_limited
-  , pressure_limit_limited
-
   , ie_ratio_limited
   , ie_inhale
   , ie_exhale
+
+  , volume_limit_limited
+  , pressure_limit_limited
+  , peep_limited
 
   , cmv_mode
   , cmv_volume_goal_limited
@@ -52,6 +53,8 @@ data Controls = Controls
   , c_volume_limit       :: Stream Word32
     -- | Global limit on the pressure in the lungs (Pa).
   , c_pressure_limit     :: Stream Word32
+    -- | Positive end-expiratory pressure setting (Pa).
+  , c_peep               :: Stream Word32
 
     -- | CMV mode: True means VC, False means PC.
   , c_cmv_mode           :: Stream Bool
@@ -68,6 +71,7 @@ controls = Controls
   , c_ie_ratio          = extern "c_ie_ratio"          Nothing
   , c_volume_limit      = extern "c_volume_limit"      Nothing
   , c_pressure_limit    = extern "c_pressure_limit"    Nothing
+  , c_peep              = extern "c_peep"              Nothing
   , c_cmv_mode          = extern "c_cmv_mode"          Nothing
   , c_cmv_volume_goal   = extern "c_cmv_volume_goal"   Nothing
   , c_cmv_pressure_goal = extern "c_cmv_pressure_goal" Nothing
@@ -126,6 +130,18 @@ pressure_limit_limited =
   maxL  = global_pressure_max
   minL  = global_pressure_min
   limit = c_pressure_limit controls
+
+-- | Sane values for PEEP? It is relative to ambient pressure, and is positive
+-- by definition/name, so 0 is the obvious lower bound.
+-- TODO decide on a sensible upper bound.
+peep_limited :: Stream Word32
+peep_limited =
+  if peep <= minP then minP else if peep >= maxP then maxP else peep
+  where
+  -- Roughly 10 cmH2O
+  maxP = constant 500
+  minP = 0
+  peep = c_peep controls
 
 -- | Inhale/exhale ratio: numerator (inhale) in high 8 bits, denominator
 -- (exhale) in low 8 bits.
