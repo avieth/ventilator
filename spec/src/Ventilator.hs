@@ -44,29 +44,31 @@ spec = do
   --   void control_motor(int32_t desired_flow, int8_t motor_velocity)
   --
   -- "every_us 0" as in "at least 0us pass between each trigger"
-  trigger "control_motor" (every_us 0) [arg motor]
+  trigger "control_motor" (every_us 0) [
+      arg_named "motor_velocity" motor
+    ]
 
   -- At most once every 10ms call
   --
   --   void update_ui()
   --
   trigger "update_ui" (every_us 10000) [
-      arg $ desired_flow
-    , arg $ motor
-    , arg $ s_piston_high (s_piston sensors)
-    , arg $ s_piston_low  (s_piston sensors)
-    , arg $ bpm_limited
-    , arg $ volume_limit_limited
-    , arg $ pressure_limit_limited
-    , arg $ ie_inhale
-    , arg $ ie_exhale
-    , arg $ cmv_mode
-    , arg $ cmv_volume_goal_limited
-    , arg $ cmv_pressure_goal_limited
-    , arg $ global_volume_max
-    , arg $ global_volume_min
-    , arg $ global_pressure_max
-    , arg $ global_pressure_min
+      arg_named "desired_flow"   $ desired_flow
+    , arg_named "motor_velocity" $ motor
+    , arg_named "s_piston_high"  $ s_piston_high (s_piston sensors)
+    , arg_named "s_piston_low"   $ s_piston_low  (s_piston sensors)
+    , arg_named "bpm_limited"    $ bpm_limited
+    , arg_named "volume_limit"   $ volume_limit_limited
+    , arg_named "pressure_limit" $ pressure_limit_limited
+    , arg_named "ie_inhale"      $ ie_inhale
+    , arg_named "ie_exhale"      $ ie_exhale
+    , arg_named "cmv_mode"       $ cmv_mode
+    , arg_named "cmv_volume_goal"   $ cmv_volume_goal_limited
+    , arg_named "cmv_pressure_goal" $ cmv_pressure_goal_limited
+    , arg_named "global_volume_max" $ global_volume_max
+    , arg_named "global_volume_min" $ global_volume_min
+    , arg_named "global_pressure_max" $ global_pressure_max
+    , arg_named "global_pressure_min" $ global_pressure_min
     ]
 
   -- Whenever the `alarm` signal is true, call into the C function

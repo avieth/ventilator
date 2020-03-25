@@ -1,8 +1,14 @@
 packages:
   ventilator-spec.cabal
 
+optional-packages:
+  ../../lib/copilot-c99/copilot-c99.cabal
+  ../../lib/copilot-core/copilot-core.cabal
+  ../../lib/copilot-language/copilot-language.cabal
+
 -- Needs a bug fix to the C code generator.
-source-repository-package
-  type: git
-  location: https://github.com/avieth/copilot-c99.git
-  tag: 35f576a9fe6788495232c2bd0e6bc50350c0d085
+--source-repository-package
+--  type: git
+--  location: https://github.com/avieth/copilot-c99.git
+--  tag: 35f576a9fe6788495232c2bd0e6bc50350c0d085
+
