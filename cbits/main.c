@@ -42,29 +42,54 @@
  * whenever sensors are sampled.
  */
 
-// 12 breaths per minute
-uint8_t user_bpm = 12;
-// 1:2 I:E ratio
-uint16_t user_ie_ratio = 0x0102;
-// Constant time delta between steps of 1ms.
-uint32_t time_delta_ms = TIME_DELTA_MS;
-// Flow sensor
-int32_t flow = 0;
-int32_t flow_check = 0;
-// Pressure sensor
-int32_t pressure = 0;
-int32_t pressure_check = 0;
-// Oxygen concentration sensor
-uint32_t o2_concentration = 0;
-uint32_t o2_concentration_check = 0;
-// CMV mode is volume controlled
-bool cmv_mode = true;
-// Volume in the lungs. Here we simulate it by integrating flow
-int32_t volume = 0;
-// Operator-controlled volume limit. 500mL
-int32_t user_volume_limit = 500000;
-// Operator-controlled pressure goal for PC CMV. 30cm H2O, or approx 3000 Pa
-int32_t user_cmv_pressure_goal = 3000;
+// Controls
+uint8_t c_bpm = 12;
+uint16_t c_ie_ratio = 0x0102;
+uint32_t t_delta_us = 1000;
+bool c_cmv_mode = true;
+uint32_t c_volume_limit = 1000000;
+uint32_t c_pressure_limit = 5000;
+uint32_t c_cmv_volume_goal = 500000;
+uint32_t c_cmv_pressure_goal = 3000;
+
+// Observed things (computed, since this is a simulation)
+
+// uL/ms
+int32_t s_flow = 0;
+int32_t s_pressure = 0;
+// uL
+int32_t s_volume = 0;
+
+/**
+ * Some constants and variables for simulation. Here we admit floating point
+ * arithmetic since this is not to run on a low-power device.
+ */
+
+/**
+ * Length of the cylinder in which the piston moves. 15cm (in um).
+ */
+const double cylinder_length = 150000.0;
+
+/**
+ * Displacement of air (ul) per um movement in the piston
+ */
+const double displacement = 7.0;
+
+/**
+ * The simulation computes the position of the piston where 0.0 means fully
+ * retracted (chamber is full of air to be delivered) and 1.0 means fully
+ * extended (cannot push any more air into the patient).
+ */
+double piston_position = 0.0;
+
+/**
+ * How fast the piston moves in um/us at full duty cycle (magnitude 127 motor
+ * velocity signal). Speeds at lower magnitudes are linearly interpolated.
+ *
+ * It's defined such that, at full power, the piston can traverse the cylinder
+ * in 500ms.
+ */
+const double piston_speed = 0.3;
 
 /**
  * Lung compliance, for a simulated model of pressure.
@@ -76,8 +101,12 @@ int32_t user_cmv_pressure_goal = 3000;
  * for now.
  * Apparently constant compliance is observed in real lungs and 200 mL/cmH2O is
  * said to be a typical pulminary compliance for a healthy adult...
+ *
+ * TODO just use a double.
  */
 int32_t compliance = 250;
+
+
 
 /**
  * Updates the simulation model according to the flow value at an instant.
@@ -89,31 +118,39 @@ int32_t compliance = 250;
  * Pressure is computed according to the compliance.
  *
  * O2 concentration is never changed.
+ *
+ * TODO change this so that flow is computed from motor velocity.
+ * Define some constant of how much air it displaces per mm moved, and how
+ * far it moves according to the velocity magnitude in [0,127].
+ * Would also need the size of the cylinder so we can simulate the high/low
+ * sensors.
  */
 void update_model(int32_t in_flow) {
 
-  // Take flow from the "sensor" value; no independent redundant sensor.
-  flow = in_flow;
-  flow_check = flow;
+  s_flow = in_flow;
+
+  // FIXME
+  // We have flow in uL/ms, but we have a microsecond time step.
+  // Better to update the model once per millisecond.
+  int32_t t_delta_ms = ((int32_t) t_delta_us) / 1000;
+  int32_t d_flow = in_flow * t_delta_ms;
 
   // Integrate flow to get volume. NB: flow is microlitres per millisecond and
-  // we have a time delta in milliseconds.
-  volume += in_flow * (int32_t) time_delta_ms;
+  // we have a time delta in microseconds.
+  s_volume += d_flow;
 
   // Simple constant compliance model for pressure.
   // Since, for compliant lungs, the pressure change will be a fraction of the
   // volume change, and since we don't want to use any floating point
   // arithmetic, we'll compute the whole part and fractional part separately.
-  int32_t d_pressure = (1000 * in_flow * (int32_t) time_delta_ms) / compliance;
+  int32_t d_pressure = (1000 * d_flow) / compliance;
   int32_t d_pressure_fract = d_pressure % 1000;
   int32_t d_pressure_whole = d_pressure / 1000;
   static int32_t d_pressure_fract_accum = 0;
   d_pressure_fract_accum += d_pressure_fract;
-  pressure += d_pressure_whole;
-  pressure += d_pressure_fract_accum / 1000;
+  s_pressure += d_pressure_whole;
+  s_pressure += d_pressure_fract_accum / 1000;
   d_pressure_fract_accum %= 1000;
-  // No redundant sensor for pressure in the model.
-  pressure_check = pressure;
 }
 
 /**
@@ -121,8 +158,8 @@ void update_model(int32_t in_flow) {
  * flow whenever it needs to be set. That decision is defined in a rather
  * high-level way in the Haskell copilot program.
  */
-void set_flow(int32_t in_flow) {
-  update_model(in_flow);
+void control_motor(int32_t in_desired_flow, int8_t in_motor_velocity) {
+  update_model(in_desired_flow);
 }
 
 void raise_alarm(void) {
@@ -133,12 +170,51 @@ void raise_alarm(void) {
   exit(1);
 }
 
-#define PLOT_TIME_STEP 200
+#define PLOT_TIME_STEP 200000
 
 /**
- * We'll display the total elapsed time.
+ * We'll display the total elapsed time (microseconds).
+ * No bother about overflow, this is just a demo.
  */
-uint32_t time_ms = 0;
+uint32_t time_us = 0;
+
+
+void input(void) {
+  int ch = getch();
+  if (ch == ERR) {
+    return;
+  }
+  // TODO these checks not needed. The logic does limits. We can modify these
+  // but read out from derived signals given to update_ui.
+  switch (ch) {
+    case 's':
+      c_bpm = (c_bpm <= 6) ? 6 : c_bpm - 1;
+      break;
+    case 'w':
+      c_bpm = (c_bpm >= 255) ? 255 : c_bpm + 1;
+      break;
+    case 'd':
+      c_cmv_volume_goal = (c_cmv_volume_goal <= 1000) ? 1000 : c_cmv_volume_goal - 1000;
+      break;
+    case 'e':
+      c_cmv_volume_goal = (c_cmv_volume_goal >= 5000000) ? 5000000 : c_cmv_volume_goal + 1000;
+      break;
+    case 'f':
+      c_cmv_pressure_goal = (c_cmv_pressure_goal <= 1000) ? 100 : c_cmv_pressure_goal - 100;
+      break;
+    case 'r':
+      c_cmv_pressure_goal = (c_cmv_pressure_goal >= 5000000) ? 5000000 : c_cmv_pressure_goal + 100;
+      break;
+    case 'm':
+      c_cmv_mode = (c_cmv_mode == true) ? false : true;
+      break;
+    case 'Q':
+    case 'q':
+      endwin();
+      exit(1);
+      break;
+  }
+}
 
 /**
  * This is just a big messy rounte to display plots using ncurses.
@@ -152,45 +228,79 @@ uint32_t time_ms = 0;
  * only 800ms, but every 200ms gives 16 seconds which is probably enough to see
  * an entire breath cycle.
  */
-void display(void) {
+void update_ui(
+    int32_t in_desired_flow
+  , int8_t in_motor
+  , uint8_t in_bpm
+  , uint32_t in_volume_limit
+  , uint32_t in_pressure_limit
+  , uint8_t in_ie_inhale
+  , uint8_t in_ie_exhale
+  , bool in_cmv_mode
+  , uint32_t in_cmv_volume_goal
+  , uint32_t in_cmv_pressure_goal
+  , uint32_t in_global_volume_max
+  , uint32_t in_global_volume_min
+  , uint32_t in_global_pressure_max
+  , uint32_t in_global_pressure_min
+  ) {
 
   int height, width;
   getmaxyx(stdscr, height, width);
+  int row = 0;
 
-  // We need at least 10 rows per-plot, plus 3 rows for the plot headings, 1
-  // row for the main heading, and 2 rows for the footer (not implemented).
-  if (height < 36) {
-    mvprintw(0, 0, "Window too small");
+  // We need at least 10 rows per-plot, plus 3 rows for the plot headings, 2
+  // rows for the main heading, and 2 rows for the footer (not implemented).
+  if (height < 37) {
+    mvprintw(row, 0, "Window too small");
     refresh();
     return;
   };
 
-  mvprintw(0, 0, "BPM: %i, I:E %i:%i, time: %i ms", user_bpm, user_ie_ratio >> 8, user_ie_ratio & 0x00FF, time_ms);
+  move(row, 0);
+  clrtoeol();
+  if (in_cmv_mode == true) {
+    mvprintw(row, 0, "Volume control target %d.%03d mL", in_cmv_volume_goal / 1000, abs(in_cmv_volume_goal % 1000));
+  } else {
+    mvprintw(row, 0, "Pressure control target %d.%03d cm H2O", (in_cmv_pressure_goal * 1000) / 98000, abs(((in_cmv_pressure_goal * 1000) / 98) % 1000));
+  }
 
-  int plot_height = (height - 6) / 3;
+  row += 1;
+  move(row, 0);
+  clrtoeol();
+  mvprintw(row, 0,
+      "BPM: %i, I:E %i:%i, time: %i ms",
+      in_bpm,
+      in_ie_inhale,
+      in_ie_exhale,
+      time_us / 1000
+  );
+  row += 1;
+
+  int plot_height = (height - 7) / 3;
 
   // Print headings for each plot.
   // We choose units that are apparently common on real ventilators:
   //   Volume in mL
   //   Flow in L/min
   //   Pressure in cm H2O
-  int volume_header_row = 1;
-  int flow_header_row = volume_header_row + plot_height + 2;
-  int pressure_header_row = flow_header_row + plot_height + 2;
+  int volume_header_row = row;
+  int flow_header_row = volume_header_row + plot_height + row;
+  int pressure_header_row = flow_header_row + plot_height + row;
   move(volume_header_row, 0);
   clrtoeol();
   // Volume is in uL so getting mL with 4 decimal points is simple.
-  mvprintw(volume_header_row, 0, "Volume: %d.%03d mL", volume / 1000, volume % 1000);
+  mvprintw(volume_header_row, 0, "Volume: %d.%03d mL", s_volume / 1000, abs(s_volume % 1000));
   move(flow_header_row, 0);
   clrtoeol();
   // Flow is in uL/ms, or equivalently mL/s.
-  int32_t flow_ml_min = flow * 60;
-  mvprintw(flow_header_row, 0, "Flow: %d.%03d L/min", flow_ml_min / 1000, flow_ml_min % 1000);
+  int32_t flow_ml_min = s_flow * 60;
+  mvprintw(flow_header_row, 0, "Flow: %d.%03d L/min", flow_ml_min / 1000, abs(flow_ml_min % 1000));
   move(pressure_header_row, 0);
   clrtoeol();
   // Pressure is in Pa, and there are approx. 98 per cm H2O. We'll first multiply
   // by 1000 so we can get the decimal places.
-  mvprintw(pressure_header_row, 0, "Pressure: %d.%03d cm H2O", (pressure * 1000) / 98000, ((pressure * 1000) / 98) % 1000);
+  mvprintw(pressure_header_row, 0, "Pressure: %d.%03d cm H2O", (s_pressure * 1000) / 98000, abs(((s_pressure * 1000) / 98) % 1000));
 
   // For each plot we have a top row. The plot's row space is this up to
   // this plus plot_height.
@@ -200,13 +310,13 @@ void display(void) {
 
   // The column for the current frame is special.
   // The value at `sample` goes at this column.
-  int now_column = (time_ms / PLOT_TIME_STEP) % width;
-  int row = 0;
+  int now_column = (time_us / PLOT_TIME_STEP) % width;
+  row = 0;
 
-  int volume_step = 1000000 / plot_height;
+  int volume_step = in_global_volume_max / plot_height;
   for (int i = 0; i < plot_height; ++i) {
     row = volume_plot_y + plot_height - i;
-    if (volume >= (i * volume_step) && volume < ((i + 1) * volume_step)) {
+    if (s_volume >= (i * volume_step) && s_volume < ((i + 1) * volume_step)) {
       mvprintw(row, now_column, "+");
     } else {
       mvprintw(row, now_column, " ");
@@ -214,11 +324,12 @@ void display(void) {
     mvprintw(row, now_column + 1, "|");
   }
 
+  // TODO have an input max flow given
   int flow_step = 1024 / plot_height;
   int min_flow = -512;
   for (int i = 0; i < plot_height; ++i) {
     row = flow_plot_y + plot_height - i;
-    if (flow >= (i * flow_step + min_flow) && flow < ((i + 1) * flow_step + min_flow)) {
+    if (s_flow >= (i * flow_step + min_flow) && s_flow < ((i + 1) * flow_step + min_flow)) {
       mvprintw(row, now_column, "+");
     } else {
       mvprintw(row, now_column, " ");
@@ -226,11 +337,11 @@ void display(void) {
     mvprintw(row, now_column + 1, "| ");
   }
 
-  int pressure_step = 4000 / plot_height;
-  int min_pressure = 0;
+  int pressure_step = in_global_pressure_max / plot_height;
+  int min_pressure = in_global_pressure_min;
   for (int i = 0; i < plot_height; ++i) {
     row = pressure_plot_y + plot_height - i;
-    if (pressure >= (i * pressure_step + min_pressure) && pressure < ((i + 1) * pressure_step + min_pressure)) {
+    if (s_pressure >= (i * pressure_step + min_pressure) && s_pressure < ((i + 1) * pressure_step + min_pressure)) {
       mvprintw(row, now_column, "+");
     } else {
       mvprintw(row, now_column, " ");
@@ -239,6 +350,10 @@ void display(void) {
   }
 
   refresh();
+
+
+
+
 
 }
 
@@ -252,14 +367,17 @@ void main() {
   cbreak();
   // No terminal cursor
   curs_set(0);
+  // No delay for input
+  nodelay(stdscr, true);
 
   // Main loop: run the simulation and display the current state.
   while (1) {
-    //sample_inputs();
+    // TODO input could come from the step as well, so long as it's nonblocking.
+    input();
     step();
-    display();
-    time_ms += time_delta_ms;
-    if (usleep(time_delta_ms * 1000) != 0) { break; }
+    //display();
+    time_us += t_delta_us;
+    if (usleep(t_delta_us) != 0) { break; }
   }
 
   // Tear down ncurses and exit.

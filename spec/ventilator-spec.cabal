@@ -18,7 +18,13 @@ extra-source-files:  CHANGELOG.md
 
 executable spec
   main-is:             Main.hs
-  other-modules:       Ventilator
+  other-modules:       CMV
+                       Controls
+                       Cycle
+                       Redundancy
+                       Sensors
+                       Time
+                       Ventilator
   -- other-extensions:
   build-depends:       base >=4.12 && <4.13,
                        copilot,
