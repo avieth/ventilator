@@ -24,6 +24,7 @@ executable spec
                        Redundancy
                        Sensors
                        Time
+                       Util
                        Ventilator
   -- other-extensions:
   build-depends:       base >=4.12 && <4.13,
