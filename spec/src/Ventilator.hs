@@ -28,7 +28,7 @@ import Copilot.Compile.C99
 
 -- Copilot redefines common notions to work over streams. We'll usually want
 -- those.
-import Prelude hiding ((>), (<), (||))
+import Prelude hiding ((&&), (>), (<), (||))
 
 import Controls
 import Sensors
@@ -43,16 +43,18 @@ spec = do
   --
   --   void control_motor(int32_t desired_flow, int8_t motor_velocity)
   --
-  trigger "control_motor" (every_us 0) [arg desired_flow, arg motor]
+  -- "every_us 0" as in "at least 0us pass between each trigger"
+  trigger "control_motor" (every_us 0) [arg motor]
 
   -- At most once every 10ms call
   --
   --   void update_ui()
   --
-  --
   trigger "update_ui" (every_us 10000) [
       arg $ desired_flow
     , arg $ motor
+    , arg $ s_piston_high (s_piston sensors)
+    , arg $ s_piston_low  (s_piston sensors)
     , arg $ bpm_limited
     , arg $ volume_limit_limited
     , arg $ pressure_limit_limited
@@ -75,10 +77,6 @@ spec = do
   -- TODO should have an alarm code.
   trigger "raise_alarm" alarm []
 
-  where
-
-  every_step = every_us 0
-
 -- | Write out the spec to C in "ventilator.h" and "ventilator.c"
 gen_c :: IO ()
 gen_c = reify spec >>= compile "ventilator"
@@ -96,6 +94,10 @@ gen_c = reify spec >>= compile "ventilator"
 -- so that the UI signal can use it.
 -- Also should probably distinguish between critical alarms which imply motor
 -- shutdown, and warnings which do not.
+--
+--
+-- TODO an alarm in case the high sensor is true but desired volume or
+-- pressure was not reached.
 alarm :: Stream Bool
 alarm = foldr (||) (constant False) checks
   where
@@ -126,12 +128,28 @@ desired_flow = cmv_flow
 --
 -- Currently it's very stupid: max if we need more flow, min if we need less.
 -- FIXME make it better.
+-- FIXME TODO it's essential that the flow is limited to eliminate the
+-- possibility of too high an increase in pressure, since that could harm the
+-- patient. Since all that we control is the motor speed, we do not limit
+-- flow directly; we have to limit motor speed instead and have some sort of
+-- idea about the relationship between motor speed and flow.
 motor :: Stream Int8
 motor =
-  if observed_flow < desired_flow
-  then 127
-  else if observed_flow > desired_flow
-  then -127
-  else 0
+  -- High and low sensors indicate that the piston cannot move any further, so
+  -- motor velocity should be 0.
+  if v > 0 && s_piston_high (s_piston sensors)
+  then 0
+  else if v < 0 && s_piston_low (s_piston sensors)
+  then 0
+  else v
   where
+  -- This is not workable in a simulation where flow changes instantly, because
+  -- it can hop down below the desired flow, causing it to bump back up, and
+  -- so on ad infinitum. In the real world this _probably_ won't happen but
+  -- it could.
+  v = if observed_flow < desired_flow
+      then 127
+      else if observed_flow > desired_flow
+      then -127
+      else 0
   observed_flow = Sensors.flow
