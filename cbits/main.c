@@ -57,6 +57,8 @@ uint32_t c_cmv_pressure_goal = 3000;
 
 // uL/ms
 int32_t s_flow = 0;
+int32_t s_internal_pressure_1 = 0;
+int32_t s_internal_pressure_2 = 0;
 int32_t s_pressure = 0;
 // uL
 int32_t s_volume = 0;
@@ -175,6 +177,8 @@ void update_model(int8_t in_motor_velocity) {
   static double fp_pressure = 0.0;
   fp_pressure += (displacement * d_piston_position) / compliance;
   s_pressure = round(fp_pressure);
+  s_internal_pressure_1 = s_pressure;
+  s_internal_pressure_2 = s_pressure;
 }
 
 /**

@@ -181,16 +181,14 @@ cmv_flow =
   -- The rate of pressure increase w.r.t. flow depends upon the patient (their
   -- lung compliance). This crude approximation of a sensible algorithm simply
   -- increases flow until pressure is reached, but does not do a good job of
-  -- insuring it ever is reached.
+  -- ensuring it ever is reached.
   --
   -- It also respects the operator-controlled tidal volume limit.
   inhale_pc :: Stream Int32
-  inhale_pc = constant 0
-    {-
-    if (observed_pressure >= desired_pressure) || (observed_volume >= volume_limit_limited)
+  inhale_pc =
+    if (observed_pressure >= desired_pressure) || (observed_volume >= unsafeCast volume_limit_limited)
     then 0
-    else (volume_limit_limited `div` unsafeCast duration) + 1
-      -}
+    else 300
 
   -- The exhale subcycle is the same for VC and PC: decrease flow linearly
   -- in such a way that we expect volume to return to 0.
