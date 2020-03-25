@@ -38,10 +38,14 @@ assurance of correctness and safety.
 
 ## How to build
 
+Generated files are included in [./gen](./gen) so that you don't have to
+install the Haskell platform in order to get started.
+
 Automated build coming soon, but for now it's simple enough to do by hand.
 
 ```sh
-# Generate the C assets using the Haskell spec
+# Generate the C assets using the Haskell spec.
+# Or, just use the files in ./gen
 $ cd spec
 $ cabal new-run
 
