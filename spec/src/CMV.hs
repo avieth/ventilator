@@ -86,17 +86,14 @@ cmv_cycle = CMVCycle
 -- | Flow signal under CMV (`cmv_cycle`), i.e. desired change in volume at
 -- an instant.
 --
--- TODO this must be converted into motor control. Would that be feasible? To
--- define the desired flow as we do here, and then a completely independent
--- program which determines motor velocity based on desired flow? It'd have
--- have some memory: push harder until desired flow goes down? Or... no, since
--- it can look at current flow, yeah it sould be fasible.
---
 -- Property: the system volume must begin at 0 and increase during the inhale
 -- phase, and return to 0 by the end of the exhale phase.
 --
 -- A simple model: go up to a given maximum flow for inhale phase, then
 -- drop to a minimum negative flow and move towards 0 for exhale.
+--
+-- TODO should respect PEEP, whether in VC or PC mode.
+--
 cmv_flow :: Stream Int32
 cmv_flow =
   -- Check this so that we can safely divide by it otherwise.
