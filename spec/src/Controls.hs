@@ -21,6 +21,7 @@ module Controls
   , cmv_pressure_goal_limited
 
   -- TODO move these to a different module, they are not controls.
+  , global_max_flow
   , global_volume_min
   , global_volume_max
   , global_pressure_min
@@ -97,15 +98,28 @@ bpm_limited = if bpm <= 6 then 6 else if bpm >= 60 then 60 else bpm
 -- There are user-controlled limits, but those limits must be limited to values
 -- which are highly unlikely to be harmful.
 
+-- | Max safe flow in uL/ms
+-- 90 L/minute
+-- TODO sensible value?
+-- This is also limited by hardware of course.
+global_max_flow :: Stream Word32
+global_max_flow = constant 1500
+
 global_pressure_max :: Stream Word32
 global_pressure_max = constant 5000
 
+-- TODO are we dealing with absolute or relative pressure? If relative we'll
+-- need a signed integer.
+-- Probably should deal in relative, since that's what the PEEP value is:
+-- pressure above ambient.
 global_pressure_min :: Stream Word32
 global_pressure_min = constant 100
 
+-- | uL
 global_volume_max :: Stream Word32
 global_volume_max = constant 1000000
 
+-- | uL
 global_volume_min :: Stream Word32
 global_volume_min = constant 100000
 

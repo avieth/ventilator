@@ -28,12 +28,13 @@ import Copilot.Compile.C99
 
 -- Copilot redefines common notions to work over streams. We'll usually want
 -- those.
-import Prelude hiding ((&&), (>), (<), (||))
+import Prelude hiding ((++), (&&), (>), (>=), (<), (||))
 
 import Controls
 import Sensors
 import CMV
 import Time
+import Util
 
 -- | The spec for the ventilator program.
 spec :: Spec
@@ -129,7 +130,8 @@ desired_flow = cmv_flow
 -- | Here we use the desired and observed flow to determine motor velocity.
 --
 -- Currently it's very stupid: max if we need more flow, min if we need less.
--- FIXME make it better.
+-- FIXME make it better. It will probably get a little complex, so define it
+-- in a dedicated module.
 -- FIXME TODO it's essential that the flow is limited to eliminate the
 -- possibility of too high an increase in pressure, since that could harm the
 -- patient. Since all that we control is the motor speed, we do not limit
@@ -139,19 +141,25 @@ motor :: Stream Int8
 motor =
   -- High and low sensors indicate that the piston cannot move any further, so
   -- motor velocity should be 0.
-  if v > 0 && s_piston_high (s_piston sensors)
+  if velocity > 0 && s_piston_high (s_piston sensors)
   then 0
-  else if v < 0 && s_piston_low (s_piston sensors)
+  else if velocity < 0 && s_piston_low (s_piston sensors)
   then 0
-  else v
+  else velocity
+
   where
-  -- This is not workable in a simulation where flow changes instantly, because
-  -- it can hop down below the desired flow, causing it to bump back up, and
-  -- so on ad infinitum. In the real world this _probably_ won't happen but
-  -- it could.
-  v = if observed_flow < desired_flow
-      then 127
-      else if observed_flow > desired_flow
-      then -127
-      else 0
+
+  velocity = integral 0 acceleration
+
+  -- If the maximum flow is observed, do not accelerate anymore.
+  acceleration =
+    -- global max flow is unsigned, but surely will not be 2^31 or greater.
+    if observed_flow >= unsafeCast global_max_flow
+    then 0
+    else if (observed_flow < desired_flow) && (velocity < 127)
+    then  1
+    else if (observed_flow > desired_flow) && (velocity > (-127))
+    then -1
+    else  0
+
   observed_flow = Sensors.flow
