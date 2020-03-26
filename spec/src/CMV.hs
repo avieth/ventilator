@@ -87,10 +87,11 @@ cmv_cycle = CMVCycle
 -- an instant.
 --
 -- Property: the system volume must begin at 0 and increase during the inhale
--- phase, and return to 0 by the end of the exhale phase.
+-- phase, and return to 0 by the end of the exhale phase (begin with no flow,
+-- end with no flow).
 --
--- A simple model: go up to a given maximum flow for inhale phase, then
--- drop to a minimum negative flow and move towards 0 for exhale.
+-- According to the CMV mode (volume or pressure control) this will give
+-- positive flow until the relevant goal has been approximately reached.
 --
 -- TODO should respect PEEP, whether in VC or PC mode.
 --
@@ -136,16 +137,11 @@ cmv_flow =
   duration_ms :: Stream Int32
   duration_ms = unsafeCast (duration `div` 1000)
 
-  {-
-  elapsed :: Stream Word32
-  elapsed = cmv_current_elapsed cmv_cycle
+  elapsed_ms :: Stream Int32
+  elapsed_ms = unsafeCast (cmv_current_elapsed cmv_cycle `div` 1000)
 
-  -- Cast Word32 -> Int32 is unsafe because yes it may overflow. But that
-  -- would imply that the time remaining is greater than 2^31 which is quite
-  -- a long time for a breath.
-  remaining :: Stream Int32
-  remaining = unsafeCast (duration - elapsed)
-  -}
+  remaining_ms :: Stream Int32
+  remaining_ms = duration_ms - elapsed_ms
 
   -- Target tidal volume (microlitres).
   --
@@ -198,8 +194,8 @@ cmv_flow =
   -- TODO should use pressure not volume?
   exhale :: Stream Int32
   exhale =
-    if observed_volume <= 0
+    if observed_volume <= 1000
     then 0
-    -- FIXME this is totally wrong. Must use sensors.
-    else -((desired_volume `div` duration_ms) + 1)
-
+    else if remaining_ms <= 0
+    then 0
+    else -4 * ((observed_volume `div` remaining_ms) + 1)
