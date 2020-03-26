@@ -311,6 +311,7 @@ void update_ui(
   row += 1;
 
   int plot_height = (height - 7) / 3;
+  int plot_width = width - 5;
 
   // Print headings for each plot.
   // We choose units that are apparently common on real ventilators:
@@ -343,7 +344,7 @@ void update_ui(
 
   // The column for the current frame is special.
   // The value at `sample` goes at this column.
-  int now_column = (time_us / PLOT_TIME_STEP) % width;
+  int now_column = (time_us / PLOT_TIME_STEP) % plot_width;
   row = 0;
 
   int volume_step = in_global_volume_max / plot_height;
@@ -354,7 +355,7 @@ void update_ui(
     } else {
       mvprintw(row, now_column, " ");
     }
-    mvprintw(row, now_column + 1, "|");
+    mvprintw(row, (now_column + 1) % plot_width, "|");
   }
 
   // TODO have an input max flow given
@@ -367,7 +368,7 @@ void update_ui(
     } else {
       mvprintw(row, now_column, " ");
     }
-    mvprintw(row, now_column + 1, "| ");
+    mvprintw(row, (now_column + 1) % plot_width, "|");
   }
 
   int pressure_step = in_global_pressure_max / plot_height;
@@ -379,14 +380,59 @@ void update_ui(
     } else {
       mvprintw(row, now_column, " ");
     }
-    mvprintw(row, now_column + 1, "|");
+    mvprintw(row, (now_column + 1) % plot_width, "|");
+  }
+
+  // Print a visualization of the motor velocity and piston at the right hand
+  // side.
+  // We can use all of the space on the right margin except for the top
+  //
+  // 2 rows of header.
+  int rhs_height = height - 2;
+
+  int col = width - 2;
+  int midpoint = rhs_height / 2;
+  int v_step = 256 / rhs_height;
+  int v_motor = (int) in_motor;
+  for (int i = 0; i < midpoint; ++i) {
+    if (v_motor >= 0) {
+      row = 2 + midpoint - i;
+      if (v_motor >= (i * v_step) && (v_motor <= (i + 1) * v_step || i == midpoint - 1)) {
+        mvprintw(row, col, "^");
+      } else if (v_motor >= (i * v_step)) {
+        mvprintw(row, col, "|");
+      } else {
+        mvprintw(row, col, " ");
+      }
+      row = 2 + midpoint + i;
+      mvprintw(row, col, " ");
+    } else {
+      row = 2 + midpoint + i;
+      if (v_motor <= (i * -v_step) && (v_motor >= (i + 1) * -v_step || i == midpoint - 1)) {
+        mvprintw(row, col, "v");
+      } else if (v_motor <= (i * -v_step)) {
+        mvprintw(row, col, "|");
+      } else {
+        mvprintw(row, col, " ");
+      }
+      row = 2 + midpoint - i;
+      mvprintw(row, col, " ");
+    }
+  }
+
+  col = width - 1;
+  int piston_step = (int) round(cylinder_length / (double) height);
+  int piston_position_i = (int) round(piston_position);
+  for (int i = 0; i < rhs_height; ++i) {
+    row = rhs_height - i;
+    if (piston_position >= (i * piston_step)) {
+      mvprintw(row, col, "#");
+    } else {
+      mvprintw(row, col, " ");
+    }
   }
 
   refresh();
-
-
-
-
 
 }
 
