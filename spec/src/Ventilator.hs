@@ -157,9 +157,13 @@ motor =
     if observed_flow >= unsafeCast global_max_flow
     then 0
     else if (observed_flow < desired_flow) && (velocity < 127)
-    then  1
+    then if (desired_flow - observed_flow) > constant 10
+      then 1
+      else 0
     else if (observed_flow > desired_flow) && (velocity > (-127))
-    then -1
-    else  0
+    then if (observed_flow - desired_flow) > constant 10
+      then -1
+      else 0
+    else 0
 
   observed_flow = Sensors.flow
