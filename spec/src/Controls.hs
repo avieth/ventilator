@@ -148,6 +148,8 @@ pressure_limit_limited =
 -- | Sane values for PEEP? It is relative to ambient pressure, and is positive
 -- by definition/name, so 0 is the obvious lower bound.
 -- TODO decide on a sensible upper bound.
+-- TODO use Int32 and guarantee it's positive and within bounds, so that other
+-- parts of the program do not need to unsafeCast.
 peep_limited :: Stream Word32
 peep_limited =
   if peep <= minP then minP else if peep >= maxP then maxP else peep
@@ -166,8 +168,8 @@ type IERatio = Word16
 -- | Gives the numerator and denominator of the I:E ratio subject to limits:
 --
 -- - neither is 0. If either is 0 it's set to 1.
--- - inhale is not greater than exhale. If it is, it's set to 1:1
--- - exhale is at most 4 times inhale.
+-- - either can be greater (it is indeed possible to do longer inhales) but
+--   the greater one is not more than 4 times the lesser one.
 --
 -- TODO revisit this. What are sensible constraints?
 ie_ratio_limited :: Stream IERatio
@@ -180,16 +182,24 @@ ie_ratio_limited = ier_limited
 
   ier_limited :: Stream IERatio
   ier_limited =
-        ((cast limited :: Stream Word16) .<<. constant (8 :: Word8))
-    .|. ((cast denominator_nz :: Stream Word16) .&. 0x00FF)
+        ((cast inhale :: Stream Word16) .<<. constant (8 :: Word8))
+    .|. ((cast exhale :: Stream Word16) .&. 0x00FF)
 
-  limited :: Stream Word8
-  limited =
+  inhale :: Stream Word8
+  inhale =
     if numerator_nz > denominator_nz
-    then denominator_nz
-    else if (cast denominator_nz :: Stream Word16) > ((cast numerator_nz :: Stream Word16) * constant 4)
-    then (denominator_nz `div` 4) + 1
+    then if numerator_nz > (constant 4 * denominator_nz)
+      then constant 4 * denominator_nz
+      else numerator_nz
     else numerator_nz
+
+  exhale :: Stream Word8
+  exhale =
+    if denominator_nz > numerator_nz
+    then if denominator_nz > (constant 4 * numerator_nz)
+      then constant 4 * numerator_nz
+      else denominator_nz
+    else denominator_nz
 
   numerator_nz :: Stream Word8
   numerator_nz = if numerator == 0 then 1 else numerator
