@@ -52,6 +52,7 @@ uint32_t c_volume_limit = 1000000;
 uint32_t c_pressure_limit = 5000;
 uint32_t c_cmv_volume_goal = 500000;
 uint32_t c_cmv_pressure_goal = 3000;
+uint32_t c_peep = 200;
 
 // Observed things (computed, since this is a simulation)
 
@@ -86,14 +87,14 @@ bool s_piston_high = false;
 /**
  * Length of the cylinder in which the piston moves. 15cm (in um).
  */
-const double cylinder_length = 150000.0;
+const _Fract cylinder_length = 150000.0;
 
 /**
  * The simulation computes the position of the piston where 0 means fully
  * retracted (cylinder r is full of air to be delivered) and 1.0 means it is
  * fully extended (cannot push any more air into the patient).
  */
-double piston_position = 0.0;
+_Fract piston_position = 0.0;
 
 // TODO to make the simulation viable, the flow needs to be somewhat continuous.
 // Currently it's not because acceleration of the piston is instantaneous.
@@ -104,7 +105,7 @@ double piston_position = 0.0;
 /**
  * Displacement of air (ul) per um movement in the piston
  */
-const double displacement = 7;
+const _Fract displacement = 7;
 
 /**
  * How fast the piston moves in um/us at full duty cycle (magnitude 127 motor
@@ -113,7 +114,7 @@ const double displacement = 7;
  * It's defined such that, at full power, the piston can traverse the cylinder
  * in 500ms.
  */
-const double piston_speed = 0.03;
+const _Fract piston_speed = 0.03;
 
 /**
  * Lung compliance, for a simulated model of pressure.
@@ -123,12 +124,31 @@ const double piston_speed = 0.03;
  *
  * Apparently anywhere from 100mL/cmH2O to 400mL/cmH2O is a reasonable lung
  * compliance. We'll take the midpoint 250mL/cmH2O.
- * That's 250000 mL / 98.0665 Pa
+ * But that's not consistent with what I've seen/read about ventilators:
+ * apparently 20-30 cmH2O is a common desirable pressure, and 500mL a
+ * desirable tidal volume, but to get 20-30cmH2O you would apparently need
+ * way more volume than that...
+ *
+ *   ~ 2.55mL/Pa
+ *
+ *
+ * i.e. for every approximately 2.5 mL you put in the lung, you get a ~100 Pa
+ * increase in pressure.... that can't be right though... we expect pressure
+ * to be in the 10-30 cmH2O range on inhale, but that's around 1000 to 3000
+ * Pa. Something is all wrong here...
  *
  * TODO surely compliance decreases as volume increases. May be good to include
  * this in the simulation?
  */
-const double compliance = 2549.290532;
+//const _Fract compliance = 2549.290532;
+const _Fract compliance = 254.9290532;
+
+/**
+ * Intrinsic positive end-expiratory pressure in pascals. Set to be 20 cmH2O.
+ * No idea if this is realistic, I just saw it on a google image of a ventilator
+ * screen.
+ */
+const _Fract intrinsic_peep = 1959.0;
 
 /**
  * Updates the simulation model according to the flow value at an instant.
@@ -159,7 +179,7 @@ void update_model(int8_t in_motor_velocity) {
   }
 
   // piston_speed is um/us, so we get a position change in um.
-  double d_piston_position = piston_speed * (((double) actual_motor_velocity) / 128.0) * t_delta_us;
+  _Fract d_piston_position = piston_speed * (((_Fract) actual_motor_velocity) / 128.0) * t_delta_us;
   piston_position += d_piston_position;
   s_piston_low = false;
   s_piston_high = false;
@@ -174,7 +194,7 @@ void update_model(int8_t in_motor_velocity) {
 
   s_flow = round(displacement * d_piston_position);
   s_volume += s_flow;
-  static double fp_pressure = 0.0;
+  static _Fract fp_pressure = intrinsic_peep;
   fp_pressure += (displacement * d_piston_position) / compliance;
   s_pressure = round(fp_pressure);
   s_internal_pressure_1 = s_pressure;
@@ -212,6 +232,8 @@ void input(void) {
   if (ch == ERR) {
     return;
   }
+  uint16_t i_bits = 0x0000;
+  uint16_t e_bits = 0x0000;
   // TODO these checks not needed. The logic does limits. We can modify these
   // but read out from derived signals given to update_ui.
   switch (ch) {
@@ -233,6 +255,30 @@ void input(void) {
     case 'r':
       c_cmv_pressure_goal = (c_cmv_pressure_goal >= 5000000) ? 5000000 : c_cmv_pressure_goal + 100;
       break;
+
+    case 'g':
+      i_bits = c_ie_ratio >> 8;
+      i_bits = (i_bits == 1) ? i_bits : (i_bits - 1);
+      i_bits = i_bits << 8;
+      c_ie_ratio = (c_ie_ratio & 0x00FF) | i_bits;
+      break;
+    case 't':
+      i_bits = c_ie_ratio >> 8;
+      i_bits = (i_bits == 255) ? i_bits : (i_bits + 1);
+      i_bits = i_bits << 8;
+      c_ie_ratio = (c_ie_ratio & 0x00FF) | i_bits;
+      break;
+    case 'h':
+      e_bits = c_ie_ratio & 0x00FF;
+      e_bits = (e_bits == 1) ? e_bits : (e_bits - 1);
+      c_ie_ratio = (c_ie_ratio & 0xFF00) | e_bits;
+      break;
+    case 'y':
+      e_bits = c_ie_ratio & 0x00FF;
+      e_bits = (e_bits == 255) ? e_bits : (e_bits + 1);
+      c_ie_ratio = (c_ie_ratio & 0xFF00) | e_bits;
+      break;
+
     case 'm':
       c_cmv_mode = (c_cmv_mode == true) ? false : true;
       break;
@@ -299,8 +345,10 @@ void update_ui(
   move(row, 0);
   clrtoeol();
   mvprintw(row, 0,
-      "BPM: %i, I:E %i:%i, time: %i ms, desired flow: %03i, motor vel: %03d, piston position: %e",
+      "BPM: %i, I:E set %i:%i, I:E actual %i:%i, time: %i ms, desired flow: %03i, motor vel: %03d, piston position: %e",
       in_bpm,
+      (c_ie_ratio >> 8),
+      (c_ie_ratio & 0xFF),
       in_ie_inhale,
       in_ie_exhale,
       time_us / 1000,
@@ -421,7 +469,7 @@ void update_ui(
   }
 
   col = width - 1;
-  int piston_step = (int) round(cylinder_length / (double) height);
+  int piston_step = (int) round(cylinder_length / (_Fract) height);
   int piston_position_i = (int) round(piston_position);
   for (int i = 0; i < rhs_height; ++i) {
     row = rhs_height - i;
