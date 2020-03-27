@@ -31,6 +31,8 @@ module Controls
 import Prelude hiding ((==), (>), (>=), (<=), div)
 import Language.Copilot
 
+import qualified Util as Util (clamp)
+
 -- | Organizational record for all operator control signals (user input).
 data Controls = Controls
   { -- | Breaths per minute.
@@ -86,9 +88,15 @@ controls = Controls
 error_controls :: Controls -> Stream Bool
 error_controls _ = constant False
 
--- FIXME TODO determine sensible BPM limits.
+-- | Limit the breaths per minute to [6,20]
+--
+-- The idea is that values outside of this range are not only unhealthy for
+-- the patient, but also not feasible for the hardware (in case of larger
+-- values).
+--
+-- FIXME TODO determine whether these are sensible BPM limits.
 bpm_limited :: Stream Word8
-bpm_limited = if bpm <= 6 then 6 else if bpm >= 60 then 60 else bpm
+bpm_limited = if bpm <= 6 then 6 else if bpm >= 20 then 20 else bpm
   where
   bpm = c_bpm controls
 
@@ -145,9 +153,14 @@ pressure_limit_limited =
   minL  = global_pressure_min
   limit = c_pressure_limit controls
 
--- | Sane values for PEEP? It is relative to ambient pressure, and is positive
--- by definition/name, so 0 is the obvious lower bound.
--- TODO decide on a sensible upper bound.
+-- | Positive end-expiratory pressure, in pascals.
+--
+-- Sane values for PEEP? It is relative to ambient pressure, and is positive
+-- by definition/name, so 0 is the obvious lower bound. The idea is that PEEP
+-- is always "on" but 0 means no PEEP.
+--
+-- TODO decide on a sensible upper bound. Apparently 10cmH2O is reasonable.
+--
 -- TODO use Int32 and guarantee it's positive and within bounds, so that other
 -- parts of the program do not need to unsafeCast.
 peep_limited :: Stream Word32
@@ -155,7 +168,7 @@ peep_limited =
   if peep <= minP then minP else if peep >= maxP then maxP else peep
   where
   -- Roughly 10 cmH2O
-  maxP = constant 500
+  maxP = constant 980
   minP = 0
   peep = c_peep controls
 
@@ -225,22 +238,30 @@ ie_exhale = unsafeCast (ie_ratio_limited .&. 0x00FF)
 cmv_mode :: Stream Bool
 cmv_mode = c_cmv_mode controls
 
+-- | Limited to 
+--
+-- One recommendation says that 6-8mL/kg ideal body weight is healthy.
+-- Since patient weights may vary, we'll allow for anywhere from 40-200kg.
+-- TODO check this
+--
+-- Does not use the global limited; those will be checked at all times and used
+-- to determine alarms.
 cmv_volume_goal_limited :: Stream Word32
-cmv_volume_goal_limited =
-  if goal <= global_volume_min
-  then global_volume_min
-  else if goal >= volume_limit_limited
-  then volume_limit_limited
-  else goal
+cmv_volume_goal_limited = Util.clamp lower upper (c_cmv_volume_goal controls)
   where
-  goal = c_cmv_volume_goal controls
+  -- uL for 6ml/kg of a 40kg patient
+  lower = constant 240000
+  -- uL for 8mL/kg of a 200kg patient
+  upper = constant 1600000
 
+-- | Limited to 8-20 cmH2O
+--
+-- Does not use the global limited; those will be checked at all times and used
+-- to determine alarms.
 cmv_pressure_goal_limited :: Stream Word32
-cmv_pressure_goal_limited =
-  if goal <= global_pressure_min
-  then global_pressure_min
-  else if goal >= pressure_limit_limited
-  then pressure_limit_limited
-  else goal
+cmv_pressure_goal_limited = Util.clamp lower upper (c_cmv_pressure_goal controls)
   where
-  goal = c_cmv_pressure_goal controls
+  -- ~ 8 cmH2O in Pa
+  lower = constant 784
+  -- ~ 20 cmH2O in Pa
+  upper = constant 1960

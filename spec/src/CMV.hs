@@ -163,6 +163,12 @@ cmv_flow =
   observed_volume :: Stream Int32
   observed_volume = Sensors.volume
 
+  -- The PEEP setting gives the pressure we want to maintain at the end of
+  -- the cycle. We cast it to Int32; safe unless the PEEP is > 2^31 but that
+  -- is ruled out by limits.
+  end_pressure :: Stream Int32
+  end_pressure = unsafeCast peep_limited
+
   -- VC inhale subcycle.
   -- Currently it's the simplest thing (probably too simple): linearly
   -- increase until the desired volume is reached.
@@ -186,16 +192,16 @@ cmv_flow =
     then 0
     else 300
 
-  -- The exhale subcycle is the same for VC and PC: decrease flow linearly
-  -- in such a way that we expect volume to return to 0.
+  -- The exhale subcycle is the same for VC and PC: decrease the flow until
+  -- we reach the PEEP setting (positive end expiratory pressure).
+  --
   -- TODO this will certainly need to be more clever, and respond to input
   -- signals.
-  --
-  -- TODO should use pressure not volume?
   exhale :: Stream Int32
   exhale =
-    if observed_volume <= 1000
+    if abs (end_pressure - observed_pressure) <= 10
     then 0
+    -- TODO sound an alarm if we didn't reach the PEEP.
     else if remaining_ms <= 0
     then 0
     else -4 * ((observed_volume `div` remaining_ms) + 1)
