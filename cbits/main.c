@@ -46,6 +46,7 @@
 // Controls
 uint8_t c_bpm = 12;
 uint16_t c_ie_ratio = 0x0102;
+uint32_t t_delta_ms = 1;
 uint32_t t_delta_us = 1000;
 bool c_cmv_mode = true;
 uint32_t c_volume_limit = 1000000;
@@ -87,14 +88,13 @@ bool s_piston_high = false;
 /**
  * Length of the cylinder in which the piston moves. 15cm (in um).
  */
-const _Fract cylinder_length = 150000.0;
+const int32_t cylinder_length_um = 150000;
 
 /**
- * The simulation computes the position of the piston where 0 means fully
- * retracted (cylinder r is full of air to be delivered) and 1.0 means it is
- * fully extended (cannot push any more air into the patient).
+ * The simulation computes the position of the piston in um from the origin
+ * (fully retracted). Same units as cylinder_length of course.
  */
-_Fract piston_position = 0.0;
+int32_t piston_position_um = 0.0;
 
 // TODO to make the simulation viable, the flow needs to be somewhat continuous.
 // Currently it's not because acceleration of the piston is instantaneous.
@@ -103,18 +103,20 @@ _Fract piston_position = 0.0;
 // the change in position from this!
 
 /**
- * Displacement of air (ul) per um movement in the piston
+ * Displacement of air per change in piston position (uL/um).
+ * Set to 7 so that the piston can displace 1.05L in a full cycle from 0 to
+ * cylinder_length.
  */
-const _Fract displacement = 7;
+const int32_t displacement_ul_um = 7;
 
 /**
- * How fast the piston moves in um/us at full duty cycle (magnitude 127 motor
+ * How fast the piston moves in um/ms at full duty cycle (magnitude 127 motor
  * velocity signal). Speeds at lower magnitudes are linearly interpolated.
  *
  * It's defined such that, at full power, the piston can traverse the cylinder
  * in 500ms.
  */
-const _Fract piston_speed = 0.03;
+const int32_t piston_speed_um_ms = 300;
 
 /**
  * Lung compliance, for a simulated model of pressure.
@@ -140,15 +142,13 @@ const _Fract piston_speed = 0.03;
  * TODO surely compliance decreases as volume increases. May be good to include
  * this in the simulation?
  */
-//const _Fract compliance = 2549.290532;
-const _Fract compliance = 254.9290532;
+//const double compliance = 2549.290532;
+const int32_t compliance_ul_pa = 150;
 
 /**
- * Intrinsic positive end-expiratory pressure in pascals. Set to be 20 cmH2O.
- * No idea if this is realistic, I just saw it on a google image of a ventilator
- * screen.
+ * Intrinsic positive end-expiratory pressure in cmH2O
  */
-const _Fract intrinsic_peep = 1959.0;
+const int32_t intrinsic_peep_cmh2o = 0;
 
 /**
  * Updates the simulation model according to the flow value at an instant.
@@ -171,32 +171,53 @@ const _Fract intrinsic_peep = 1959.0;
  */
 void update_model(int8_t in_motor_velocity) {
 
+  /*
   static int8_t actual_motor_velocity = 0;
   if (actual_motor_velocity > in_motor_velocity) {
     actual_motor_velocity--;
   } else if (actual_motor_velocity < in_motor_velocity) {
     actual_motor_velocity++;
-  }
+  }*/
 
-  // piston_speed is um/us, so we get a position change in um.
-  _Fract d_piston_position = piston_speed * (((_Fract) actual_motor_velocity) / 128.0) * t_delta_us;
-  piston_position += d_piston_position;
+  // Compute the change in piston position. We have the speed in um/ms at full
+  // duty cycle (in_motor_velocity is magnitude 127), and the time delta in ms,
+  // so we linearly interpolate the actual speed and multiply by the time
+  // delta.
+  int32_t motor_velocity_32 = (int32_t) in_motor_velocity;
+  int32_t motor_velocity_interp = (motor_velocity_32 * 1000) / 127;
+  int32_t d_position_um_ms = (motor_velocity_interp * piston_speed_um_ms) / 1000;
+  int32_t d_position_um = t_delta_ms * d_position_um_ms;
+
+  piston_position_um += d_position_um;
   s_piston_low = false;
   s_piston_high = false;
-  if (piston_position >= cylinder_length) {
+  if (piston_position_um >= cylinder_length_um) {
     s_piston_high = true;
-    piston_position = cylinder_length;
+    d_position_um = d_position_um - (piston_position_um - cylinder_length_um);
+    piston_position_um = cylinder_length_um;
   }
-  if (piston_position <= 0) {
+  if (piston_position_um <= 0) {
     s_piston_low = true;
-    piston_position = 0;
+    // Written like this for clarity and symmetry with the previous if
+    // block.
+    d_position_um = d_position_um + (0 - piston_position_um);
+    piston_position_um = 0;
   }
 
-  s_flow = round(displacement * d_piston_position);
-  s_volume += s_flow;
-  static _Fract fp_pressure = intrinsic_peep;
+  // Flow is supposed to be uL/ms. We have the change in position and the
+  // displacement, giving uL, so we must divide by the t_delta_ms.
+  // Not a good idea in general but here it's 1 so whatever.
+  s_flow = (displacement_ul_um * d_position_um) / ((int32_t) t_delta_ms);
+  // Volume is uL.
+  s_volume += (((int32_t) t_delta_ms) * s_flow);
+  /*
+  static double fp_pressure = intrinsic_peep;
   fp_pressure += (displacement * d_piston_position) / compliance;
   s_pressure = round(fp_pressure);
+  s_internal_pressure_1 = s_pressure;
+  s_internal_pressure_2 = s_pressure;
+  */
+  s_pressure += ((((int32_t) t_delta_ms) * s_flow) / compliance_ul_pa);
   s_internal_pressure_1 = s_pressure;
   s_internal_pressure_2 = s_pressure;
 }
@@ -354,7 +375,7 @@ void update_ui(
       time_us / 1000,
       in_desired_flow,
       in_motor,
-      piston_position
+      piston_position_um
   );
   row += 1;
 
@@ -469,11 +490,11 @@ void update_ui(
   }
 
   col = width - 1;
-  int piston_step = (int) round(cylinder_length / (_Fract) height);
-  int piston_position_i = (int) round(piston_position);
+  int piston_step = cylinder_length_um / height;
+  int piston_position_i = piston_position_um;
   for (int i = 0; i < rhs_height; ++i) {
     row = rhs_height - i;
-    if (piston_position >= (i * piston_step)) {
+    if (piston_position_um >= (i * piston_step)) {
       mvprintw(row, col, "#");
     } else {
       mvprintw(row, col, " ");
@@ -502,9 +523,8 @@ void main() {
     // TODO input could come from the step as well, so long as it's nonblocking.
     input();
     step();
-    //display();
-    time_us += t_delta_us;
-    if (usleep(t_delta_us) != 0) { break; }
+    time_us += (1000 * t_delta_ms);
+    if (usleep(t_delta_ms * 1000) != 0) { break; }
   }
 
   // Tear down ncurses and exit.
