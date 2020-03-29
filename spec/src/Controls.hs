@@ -52,7 +52,7 @@ data Controls = Controls
     -- for example).
   , c_ie_ratio           :: Stream IERatio
 
-    -- | Global limit on the volume in the lungs (uL).
+    -- | Global limit on the volume in the lungs (mL).
   , c_volume_limit       :: Stream Word32
     -- | Global limit on the pressure in the lungs (Pa).
   , c_pressure_limit     :: Stream Word32
@@ -61,7 +61,7 @@ data Controls = Controls
 
     -- | CMV mode: True means VC, False means PC.
   , c_cmv_mode           :: Stream Bool
-    -- | uL
+    -- | mL
   , c_cmv_volume_goal    :: Stream Word32
     -- | Pa
   , c_cmv_pressure_goal  :: Stream Word32
@@ -88,15 +88,11 @@ controls = Controls
 error_controls :: Controls -> Stream Bool
 error_controls _ = constant False
 
--- | Limit the breaths per minute to [6,20]
---
--- The idea is that values outside of this range are not only unhealthy for
--- the patient, but also not feasible for the hardware (in case of larger
--- values).
+-- | Limit the breaths per minute to [6,40]
 --
 -- FIXME TODO determine whether these are sensible BPM limits.
 bpm_limited :: Stream Word8
-bpm_limited = if bpm <= 6 then 6 else if bpm >= 20 then 20 else bpm
+bpm_limited = if bpm <= 6 then 6 else if bpm >= 40 then 40 else bpm
   where
   bpm = c_bpm controls
 
@@ -123,15 +119,15 @@ global_pressure_max = constant 5000
 global_pressure_min :: Stream Word32
 global_pressure_min = constant 100
 
--- | uL
+-- | mL
 global_volume_max :: Stream Word32
-global_volume_max = constant 1000000
+global_volume_max = constant 1000
 
--- | uL
+-- | mL
 global_volume_min :: Stream Word32
-global_volume_min = constant 100000
+global_volume_min = constant 100
 
--- | Limits on the global volume limit. Unit is uL.
+-- | Limits on the global volume limit. Unit is mL.
 --
 -- FIXME sensible limits. Currently it's 1L max and 100mL min
 volume_limit_limited :: Stream Word32
@@ -238,7 +234,7 @@ ie_exhale = unsafeCast (ie_ratio_limited .&. 0x00FF)
 cmv_mode :: Stream Bool
 cmv_mode = c_cmv_mode controls
 
--- | Limited to 
+-- | In milliliters
 --
 -- One recommendation says that 6-8mL/kg ideal body weight is healthy.
 -- Since patient weights may vary, we'll allow for anywhere from 40-200kg.
@@ -250,9 +246,9 @@ cmv_volume_goal_limited :: Stream Word32
 cmv_volume_goal_limited = Util.clamp lower upper (c_cmv_volume_goal controls)
   where
   -- uL for 6ml/kg of a 40kg patient
-  lower = constant 240000
+  lower = constant 240
   -- uL for 8mL/kg of a 200kg patient
-  upper = constant 1600000
+  upper = constant 1600
 
 -- | Limited to 8-20 cmH2O
 --

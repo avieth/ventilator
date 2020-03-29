@@ -28,7 +28,7 @@ data Time = Time
 -- TODO TBD is there a more sensible way to deal with time?
 time :: Time
 time = Time
-  { c_time_delta_us = extern "t_delta_us" Nothing
+  { c_time_delta_us = extern "t_delta_us" (Just (Prelude.repeat 10))
   }
 
 -- | Change in time in microseconds since the last frame.

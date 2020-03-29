@@ -68,6 +68,14 @@ volume_delivered_mm_3 :: Stream Double -> Stream Double
 volume_delivered_mm_3 theta =
   bellows_xsection_area_mm_2 * (forward_kinematics_mm theta - constant start_position)
 
+-- | Invert volume_delivered_mm_3
+-- TODO document and deal with edge cases. What if the input is more than
+-- could possibly be delivered?
+inverse_volume_delivered :: Stream Double -> Stream Double
+inverse_volume_delivered mm3 = reverse_kinematics (x_mm + constant start_position)
+  where
+  x_mm = mm3 / bellows_xsection_area_mm_2
+
 -- | Given how far the piston lies to the right of the motor shaft, determine
 -- the angle in standard right-hand-rule (see `forward_kinematics_mm` which
 -- should invert this).
@@ -167,6 +175,9 @@ forward_kinematics_mm theta = x_a + x_b
   y :: Stream Double
   y = l * sin theta_rad
 
+-- | The current right-hand-rule angle, determined by way of the motor position
+-- encoder.
+--
 -- When the encoder is at 0, we want theta to be such that
 --   forward_kinematics_mm theta = 0
 -- that's just to say,
@@ -180,10 +191,3 @@ theta = reverse_kinematics (constant start_position + degrees_per_step * full_st
 
 volume_f :: Stream Double
 volume_f = volume_delivered_mm_3 theta
-
--- Each encoder step corresponds to 100ul of volume
--- Silly thing just here for testing.
-volume_i :: Stream Int32
-volume_i = 10 * encoder_steps
-  where
-  encoder_steps = s_encoder_position (s_motor sensors)

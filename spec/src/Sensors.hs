@@ -1,22 +1,32 @@
+{-# LANGUAGE RebindableSyntax #-}
+
 module Sensors where
 
 import Language.Copilot
 import Redundancy
 
+import Prelude hiding ((++), (&&), drop)
+
 -- | Organizational record for sensors relating to the piston and motor.
-data PistonSensors = PistonSensors
+data MotorSensors = MotorSensors
   { -- | The piston is at its lowest position (cannot pull any more air from
     -- the patient).
-    s_piston_low  :: Stream Bool
+    -- Used for calibration (to 0 the encoder).
+    s_limit_low :: Stream Bool
     -- | The piston is at its highest position (cannot push any more air into
     -- the patient).
-  , s_piston_high :: Stream Bool
+    -- TODO needed? Will we have this?
+  , s_limit_high :: Stream Bool
+    -- | Signal for the encoder which tracks rotational position, from which
+    -- the position of the piston can be inferred.
+  , s_encoder_position :: Stream Int32
   }
 
-piston_sensors :: PistonSensors
-piston_sensors = PistonSensors
-  { s_piston_low  = extern "s_piston_low"  Nothing
-  , s_piston_high = extern "s_piston_high" Nothing
+motor_sensors :: MotorSensors
+motor_sensors = MotorSensors
+  { s_limit_low        = extern "s_limit_low"  Nothing
+  , s_limit_high      = extern "s_limit_high" Nothing
+  , s_encoder_position = extern "s_encoder_position" Nothing
   }
 
 -- | Organizational record for sensors relating to oxygen concentration.
@@ -49,24 +59,46 @@ pressure_sensors = PressureSensors
       }
   }
 
+-- | Organizational record for sensors relating to flow, for patient-initiated
+-- (spontaneous) breaths.
+data FlowSensors = FlowSensors
+  { s_flow_out :: WithRedundancy Int32
+  }
+
+flow_sensors :: FlowSensors
+flow_sensors = FlowSensors
+  { s_flow_out = WithRedundancy
+    { principal = extern "s_flow_1" Nothing
+    , redundant = extern "s_flow_2" Nothing
+    , threshold = extern "s_flow_t" Nothing
+    }
+  }
+
 -- | Organizational record for all sensor streams.
 data Sensors = Sensors
-  { s_piston   :: PistonSensors
+  { s_motor    :: MotorSensors
   , s_pressure :: PressureSensors
   , s_oxygen   :: OxygenSensors
+  , s_flow     :: FlowSensors
   }
 
 sensors :: Sensors
 sensors = Sensors
-  { s_piston   = piston_sensors
+  { s_motor    = motor_sensors
   , s_pressure = pressure_sensors
   , s_oxygen   = oxygen_sensors
+  , s_flow     = flow_sensors
   }
 
--- | TODO compute from sensors? Or leave external?
-flow :: Stream Int32
-flow = extern "s_flow" Nothing
+-- | The low switch for the motor must read True twice in a row in order
+-- to give True.
+low_switch :: Stream Bool
+low_switch = stream
 
--- | TODO compute from sensors? Or leave external?
-volume :: Stream Int32
-volume = extern "s_volume" Nothing
+  where
+
+  stream :: Stream Bool
+  stream = sensor && drop 1 sensor
+
+  sensor :: Stream Bool
+  sensor = [False, False] ++ s_limit_low (s_motor sensors)

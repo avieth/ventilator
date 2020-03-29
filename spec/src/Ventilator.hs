@@ -28,36 +28,117 @@ import Copilot.Compile.C99
 
 -- Copilot redefines common notions to work over streams. We'll usually want
 -- those.
-import Prelude hiding ((++), (&&), (>), (>=), (<), (||))
+import Prelude hiding ((++), (&&), (>), (>=), (<), (<=), (||), (==), div, drop, mod, not)
 
 import Controls
 import Sensors
 import CMV
+import Kinematics
 import Time
 import Util
+
+import Motor
+
+pulsedata :: PulseData
+pulsedata = pulse_data_from_velocity_dps velocity
+
+  where
+
+  velocity = if calibrated then velocity_main else velocity_calibrate
+
+  -- NB: we can't expect the actual kinematics stuff to work with arbitrary
+  -- rotation. The arithmetic/trig breaks down if we rotate too far
+  -- FIXME what to do about that, from a safety perspective?
+  --
+  -- Thresholds here are 5000uL, to avoid jerking back and forth around 0.
+  velocity_main :: Stream Int32
+  velocity_main =
+    if (volume_goal - Kinematics.volume_f) > 5000.0
+    then 45
+    else if (Kinematics.volume_f - volume_goal) > 5000.0
+    then -45
+    else 0
+  volume_goal :: Stream Double
+  volume_goal = unsafeCast (1000 * vmode_volume_ml cmv)
+  remaining_time_us :: Stream Word32
+  remaining_time_us = vmode_interval_us cmv
+  --theta_needed :: Stream Double
+  --theta_needed = inverse_volume_delivered volume_goal
+  --d_degree :: Stream Double
+  --d_degree = radians_to_degrees (theta - theta_needed)
+  -- How many degrees per second needed in order to reach the goal.
+  --dps :: Stream Double
+  --dps = (1000000.0 * d_degree) / unsafeCast remaining_time_us
+
+  -- Device is calibrated once the low switch has been touched twice.
+  calibrated :: Stream Bool
+  calibrated = calibration_phase > 2
+
+  velocity_calibrate :: Stream Int32
+  velocity_calibrate =
+    if calibration_phase == 0
+    -- First step: go back to zero.
+    then -45
+    -- Second step: move forward slightly.
+    else if calibration_phase == 1
+    then 45
+    -- Third step: go back to zero again.
+    else if calibration_phase == 2
+    then -45
+    -- Fourth step: we're not in calibration mode anymore.
+    else 0
+
+  calibration_phase :: Stream Word8
+  calibration_phase = [0] ++ calibration_phase_next
+
+  -- Touch low, move back for 1 second, then touch it again.
+  calibration_phase_next :: Stream Word8
+  calibration_phase_next =
+    if (calibration_phase == 0) && low_switch
+    then 1
+    else if (calibration_phase == 1) && (elapsed > 1000000)
+    then 2
+    else if (calibration_phase == 2) && low_switch
+    then 3
+    else calibration_phase
+
+  elapsed = [0] ++ elapsed_next
+  elapsed_next =
+    if calibration_phase == 1
+    then time_delta_us + elapsed
+    else elapsed
 
 -- | The spec for the ventilator program.
 spec :: Spec
 spec = do
+
+  -- Zero the encoder value whenever the low switch is hit.
+  -- This keeps the kinematics computations closer to reality.
+  trigger "zero_encoder" low_switch []
 
   -- At every step call into
   --
   --   void control_motor(int32_t desired_flow, int8_t motor_velocity)
   --
   -- "every_us 0" as in "at least 0us pass between each trigger"
-  trigger "control_motor" (every_us 0) [
-      arg_named "motor_velocity" motor
+  trigger "control_motor" true
+    [ arg_named "us_per_pulse"  (us_per_pulse pulsedata)
+    , arg_named "motor_direction" (motor_direction pulsedata)
     ]
 
   -- At most once every 10ms call
   --
   --   void update_ui()
   --
+  {-
   trigger "update_ui" (every_us 10000) [
       arg_named "desired_flow"   $ desired_flow
-    , arg_named "motor_velocity" $ motor
+    , arg_named "motor_pulse"     $ fst motor_control
+    , arg_named "motor_direction" $ snd motor_control
+    , arg_named "volume" $ Control.volume
     , arg_named "s_piston_high"  $ s_piston_high (s_piston sensors)
     , arg_named "s_piston_low"   $ s_piston_low  (s_piston sensors)
+    , arg_named "piston_position" $ Control.forward_kinematics_mm Control.theta
     , arg_named "bpm_limited"    $ bpm_limited
     , arg_named "volume_limit"   $ volume_limit_limited
     , arg_named "pressure_limit" $ pressure_limit_limited
@@ -71,6 +152,7 @@ spec = do
     , arg_named "global_pressure_max" $ global_pressure_max
     , arg_named "global_pressure_min" $ global_pressure_min
     ]
+  -}
 
   -- Whenever the `alarm` signal is true, call into the C function
   --
@@ -122,48 +204,3 @@ alarm = foldr (||) (constant False) checks
 -- good to kill the motor with a high volume and pressure in the system.
 kill_flow :: Stream Bool
 kill_flow = alarm
-
--- | TODO switch based on controls.
-desired_flow :: Stream Int32
-desired_flow = cmv_flow
-
--- | Here we use the desired and observed flow to determine motor velocity.
---
--- Currently it's very stupid: max if we need more flow, min if we need less.
--- FIXME make it better. It will probably get a little complex, so define it
--- in a dedicated module.
--- FIXME TODO it's essential that the flow is limited to eliminate the
--- possibility of too high an increase in pressure, since that could harm the
--- patient. Since all that we control is the motor speed, we do not limit
--- flow directly; we have to limit motor speed instead and have some sort of
--- idea about the relationship between motor speed and flow.
-motor :: Stream Int8
-motor =
-  -- High and low sensors indicate that the piston cannot move any further, so
-  -- motor velocity should be 0.
-  if velocity > 0 && s_piston_high (s_piston sensors)
-  then 0
-  else if velocity < 0 && s_piston_low (s_piston sensors)
-  then 0
-  else velocity
-
-  where
-
-  velocity = integral 0 acceleration
-
-  -- If the maximum flow is observed, do not accelerate anymore.
-  acceleration =
-    -- global max flow is unsigned, but surely will not be 2^31 or greater.
-    if observed_flow >= unsafeCast global_max_flow
-    then 0
-    else if (observed_flow < desired_flow) && (velocity < 127)
-    then if (desired_flow - observed_flow) > constant 10
-      then 1
-      else 0
-    else if (observed_flow > desired_flow) && (velocity > (-127))
-    then if (observed_flow - desired_flow) > constant 10
-      then -1
-      else 0
-    else 0
-
-  observed_flow = Sensors.flow

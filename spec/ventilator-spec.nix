@@ -6,6 +6,5 @@ mkDerivation {
   isLibrary = false;
   isExecutable = true;
   executableHaskellDepends = [ base copilot copilot-c99 ];
-  license = stdenv.lib.licenses.unfree;
-  hydraPlatforms = stdenv.lib.platforms.none;
+  license = stdenv.lib.licenses.bsd3;
 }

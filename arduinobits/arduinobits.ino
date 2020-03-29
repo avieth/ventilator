@@ -126,6 +126,7 @@ void update_sensors() {
   // decrease.
   s_encoder_position = -encoder.read();
   s_limit_low = digitalRead(LIMITSWITCH_PIN) == LOW;
+  //if (s_limit_low) { Serial.println("low"); }
 }
 
 /**
