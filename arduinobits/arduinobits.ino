@@ -132,6 +132,7 @@ void update_sensors() {
  * To be triggered whenever the motor low switch is on (is LOW).
  */
 void zero_encoder() {
+  encoder.write(0);
   s_encoder_position = 0;
 }
 
