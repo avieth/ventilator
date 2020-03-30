@@ -5,18 +5,12 @@
 
 */
 
+#include "pins.h"
 #include "Pressure_Sensors.h"
 
 #define PASCAL_PER_CM_H2O 98.0665
 
 #define SENSOR_COUNT 5
-
-#define INSPPRESSUREPIN 8
-#define EXPPRESSUREPIN 9
-#define INSPFLOWPIN 10
-#define EXPFLOWPIN 11
-#define AIRINFLOWPIN 12
-
 /**
  * Indices in the offset and pin arrays.
  */
@@ -27,7 +21,13 @@
 #define AIRINFLOW 4
 
 int sensor_offsets[SENSOR_COUNT] = { 0, 0, 0, 0, 0 };
-int sensor_pins[SENSOR_COUNT] = { INSPPRESSUREPIN, EXPPRESSUREPIN, INSPFLOWPIN, EXPFLOWPIN, AIRINFLOWPIN };
+int sensor_pins[SENSOR_COUNT] = { 
+    PIN_INSP_PRESSURE,
+    PIN_EXP_PRESSURE,
+    PIN_INSP_FLOW,
+    PIN_EXP_FLOW,
+    PIN_AIR_IN_FLOW
+  };
 
 /**
  * Only call with one of the defined sensor names above.

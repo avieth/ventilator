@@ -1,33 +1,11 @@
 #include <Encoder.h>
+#include "pins.h"
 #include "SensorHandler.h"
 #include "ventilator.c"
 
-/** 
- * Pins for the position encoder.
- * These are chosen because they are interrupt pins.
- */
-#define ENC_PIN0 2
-#define ENC_PIN1 3
-
-Encoder encoder(ENC_PIN0, ENC_PIN1);
+Encoder encoder(PIN_ENC_0, PIN_ENC_1);
 
 int32_t s_encoder_position = 0;
-
-/**
- * Motor control: direction and step.
- */
-#define DIRECTION_PIN 6
-#define STEP_PIN 7
-
-/**
- * Pins 8-12 reserved for sensors (see SensorHandler.h)
- */
-
-/**
- * A switch to indicate 0 for the encoder.
- */
-#define LIMITSWITCH_PIN 13
-
 bool s_limit_low = false;
 
 /**
@@ -42,8 +20,6 @@ uint32_t c_pressure_limit = 5000;
 uint32_t c_cmv_volume_goal = 1000; //mL
 uint32_t c_cmv_pressure_goal = 3000;
 uint32_t c_peep = 200;
-
-int32_t s_internal_pressure_1 = 0;
 
 /**
  * Globals for sensor data.
@@ -81,10 +57,10 @@ void update_time() {
 }
 
 void setup() {
-  pinMode(STEP_PIN, OUTPUT);
-  pinMode(DIRECTION_PIN, OUTPUT);  
-  digitalWrite(DIRECTION_PIN, HIGH);
-  pinMode(LIMITSWITCH_PIN, INPUT_PULLUP);
+  pinMode(PIN_MOTOR_STEP, OUTPUT);
+  pinMode(PIN_MOTOR_DIRECTION, OUTPUT);
+  digitalWrite(PIN_MOTOR_DIRECTION, HIGH);
+  pinMode(PIN_MOTOR_LIMIT_SWITCH, INPUT_PULLUP);
   initializeSensors();
   Serial.begin(9600);
 }
@@ -144,9 +120,9 @@ void step_motor() {
   if (motor_direction != current_direction) {
     current_direction = motor_direction;
     if (current_direction) {
-      digitalWrite(DIRECTION_PIN, HIGH);
+      digitalWrite(PIN_MOTOR_DIRECTION, HIGH);
     } else {
-      digitalWrite(DIRECTION_PIN, LOW);
+      digitalWrite(PIN_MOTOR_DIRECTION, LOW);
     }
   }
   time_since_last_pulse_us += t_delta_us;
@@ -154,8 +130,8 @@ void step_motor() {
   if (pulse_us == 0) {
     return;
   } else if (time_since_last_pulse_us >= pulse_us) {
-    digitalWrite(STEP_PIN, LOW);
-    digitalWrite(STEP_PIN, HIGH);
+    digitalWrite(PIN_MOTOR_STEP, LOW);
+    digitalWrite(PIN_MOTOR_STEP, HIGH);
     time_since_last_pulse_us = 0;
   }
 }
@@ -168,7 +144,7 @@ void update_sensors() {
   // Am I doing direction wrong? I find that forward (positive) direction makes the encoder
   // decrease.
   s_encoder_position = -encoder.read();
-  s_limit_low = digitalRead(LIMITSWITCH_PIN) == LOW;
+  s_limit_low = digitalRead(PIN_MOTOR_LIMIT_SWITCH) == LOW;
 
   // No redundant sensors so we just copy the values.
   s_insp_pressure_1 = lroundf(getInspPressure());
