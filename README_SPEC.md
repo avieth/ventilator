@@ -45,7 +45,22 @@ assurance of correctness and safety.
 Generated files are included in [./arduinobits](./arduinobits) so that you don't
 have to install the Haskell platform in order to get started.
 
+### Fully automatic
+
 For a quick and (hopefully) reproducible build, you can use
 [nix](https://nixos.org/nix/). Install it and then run `./generate.sh`, which
 will place freshly-generated `ventilator.h` and `ventilator.c` files in the
 `./arduinobits` directory.
+
+### Semi automatic
+
+With the Haskell platform installed, the C can be generated as folllows:
+
+```
+cd ./spec
+# Builds and executed the ventilator spec generator program.
+# cabal is the Haskell build tool.
+cabal new-run
+# ventilator.h and ventilator.c files appear in current working directory.
+mv ventilator.h ventilator.c ../arduinobits/
+```
