@@ -7,7 +7,7 @@ https://www.agorize.com/en/challenges/code-life-challenge/
 ## Team
 
 - [Felix Desourdy](https://haply.co) ([Haply](https://haply.co)) - mechanical design 
-- [Alexander Vieth]() - software engineering 
+- [Alexander Vieth](https://www.linkedin.com/in/alexander-vieth-124a47ab/) - software engineering 
 - [Oliver Philbin-Briscoe]() - software engineering 
 - [Benjamin Delbos]() ([École de Technologie Supérieure](https://etsmtl.ca)) - robotics
 - [Christian Frisson](https://frisson.re)  ([McGill University](https://mcgill.ca)) - research and documentation
