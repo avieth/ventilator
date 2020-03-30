@@ -64,12 +64,6 @@ void setup() {
   digitalWrite(DIRECTION_PIN, HIGH);
   pinMode(LIMITSWITCH_PIN, INPUT_PULLUP);
   Serial.begin(9600);
-  long x = 0;
-  unsigned long y = 0;
-  double z = ((double) 60.0) / ((double) 1.25);
-  y = (unsigned long) z;
-  x = (long) y;
-  Serial.println(x);
 }
 
 /**
