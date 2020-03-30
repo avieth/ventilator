@@ -6,9 +6,6 @@
 */
 
 #include "Pressure_Sensors.h"
-#include "DeviceKinematics.h"
-#include "MotorDriver.h" 
-
 
 #define CMH20TOPASCAL 98.0665; 
 
@@ -176,16 +173,6 @@ float getAirInSensedVolume(long sensorLoopTime){
   
   return airInSensedVolume; 
 }
-
-
-
-float getPistonVolume() {
-
-  float volume = (BELLOWSDIAMETER * BELLOWSDIAMETER / 4.0f * 3.14f) * (forwardKinematics(getAngleClosedLoop())-DEVICESTARTPOSITION) ;
-
-  return volume; 
-}
-
 
 
 //CONVERSIONS
