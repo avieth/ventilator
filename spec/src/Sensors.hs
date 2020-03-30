@@ -5,7 +5,7 @@ module Sensors where
 import Language.Copilot
 import Redundancy
 
-import Prelude hiding ((++), (&&), drop)
+import Prelude hiding ((++), (&&), (>=), drop)
 
 -- | Organizational record for sensors relating to the piston and motor.
 data MotorSensors = MotorSensors
@@ -107,6 +107,19 @@ sensors = Sensors
   , s_oxygen   = oxygen_sensors
   , s_flow     = flow_sensors
   }
+
+-- | Use the inspiration flow to determine when an inhale happens.
+--
+-- Initial sketch: if it's past a threshold for 3 consecutive samples then
+-- it's an inhale.
+inhale :: Stream Bool
+inhale = is_high && drop 1 is_high && drop 2 is_high
+  where
+  is_high = [False, False, False, False] ++ sensor_is_high
+  sensor_is_high = principal (s_insp_flow (s_flow sensors)) >= threshold
+  -- TODO good threshold?
+  threshold :: Stream Int32
+  threshold = constant 16
 
 -- | The low switch for the motor must read True twice in a row in order
 -- to give True.

@@ -60,7 +60,7 @@ motor_velocity = velocity
   cmv_control = calibrated
 
   spontaneous_breath :: SpontaneousBreath
-  spontaneous_breath = false
+  spontaneous_breath = Sensors.inhale
 
   velocity_main :: Stream Int32
   velocity_main =

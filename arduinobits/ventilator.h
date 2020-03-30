@@ -1,6 +1,7 @@
 extern uint32_t t_delta_us;
 extern int32_t s_encoder_position;
 extern bool s_limit_low;
+extern int32_t s_insp_flow_1;
 extern uint8_t c_bpm;
 extern uint16_t c_ie_ratio;
 extern bool c_cmv_mode;
