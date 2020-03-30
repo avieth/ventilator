@@ -3,6 +3,7 @@
 
 module CMV
   ( CMVControl
+  , SpontaneousBreath
   , VMode (..)
   , cmv
   ) where
@@ -18,6 +19,11 @@ import Time
 -- When it goes to True, CMV exhales until the lower limit, then begins counting
 -- and runnings its cycle according to BPM and I:E ratio.
 type CMVControl = Stream Bool
+
+-- | True when the patient has tried to inhale.
+--
+-- FIXME this is not CMV. Factor this better to be more clear.
+type SpontaneousBreath = Stream Bool
 
 -- | Organizational record for a ventilation mode: it says what the volume
 -- goal is and how much time is left to reach it.
@@ -56,8 +62,8 @@ data CMVCycle = CMVCycle
 -- settings, and a commit button to start it on the next cycle.
 -- We also need sensible minimums: a BPM of less than 6 is probably not a great
 -- idea. Not all I:E ratios are sensible either.
-cmv_cycle :: CMVControl -> CMVCycle
-cmv_cycle control = CMVCycle
+cmv_cycle :: CMVControl -> SpontaneousBreath -> CMVCycle
+cmv_cycle control spontaneous_breath = CMVCycle
   { cmv_subcycle = subcycle
   , cmv_current_length = current_length
   , cmv_current_elapsed = current_elapsed
@@ -72,15 +78,22 @@ cmv_cycle control = CMVCycle
   -- and the system will immediately flip into the inhale subcycle using the
   -- BPM and I:E parameters.
 
-  -- True whenever the subcycle should change.
+  -- True whenever the subcycle should change due to time.
   subcycle_change :: Stream Bool
   subcycle_change = current_elapsed >= current_length
 
-  -- Hold the previous value unless the most recent elapsed time exceeds the
-  -- length of the subcycle.
+  -- The subcycle: true means inhaling, false means exhaling.
+  -- Hold the previous value unless there is a reason to change:
+  -- - the subcycle time is over
+  -- - the control mask changed from false to true
+  -- - the spontaneous breath stream is true and we're currently exhaling
   subcycle = [False] ++
     if control_change && control
     then false
+    -- If the patient takes a breath and we're in the exhale phase, change
+    -- to inhale.
+    else if spontaneous_breath && not subcycle
+    then not subcycle
     else if subcycle_change
     then not subcycle
     else subcycle
@@ -125,21 +138,25 @@ cmv_cycle control = CMVCycle
 -- TODO pressure control support.
 -- TODO should respect PEEP, whether in VC or PC mode.
 --
-cmv :: CMVControl -> VMode
-cmv control = VMode { vmode_volume_ml = volume_ml, vmode_interval_us = remaining_us }
+-- FIXME handles spontaneous breaths, so it's more general than CMV.
+-- Can specialize to CMV by giving constant False for the spontaneous breath
+-- stream.
+--
+cmv :: CMVControl -> SpontaneousBreath -> VMode
+cmv control spontaneous_breath = VMode { vmode_volume_ml = volume_ml, vmode_interval_us = remaining_us }
 
   where
 
   volume_ml :: Stream Word32
   volume_ml = if inhaling then cmv_volume_goal_limited else 0
 
-  inhaling = cmv_subcycle (cmv_cycle control)
+  inhaling = cmv_subcycle (cmv_cycle control spontaneous_breath)
 
   duration_us :: Stream Word32
-  duration_us = cmv_current_length (cmv_cycle control)
+  duration_us = cmv_current_length (cmv_cycle control spontaneous_breath)
 
   elapsed_us :: Stream Word32
-  elapsed_us = cmv_current_elapsed (cmv_cycle control)
+  elapsed_us = cmv_current_elapsed (cmv_cycle control spontaneous_breath)
 
   remaining_us :: Stream Word32
   remaining_us = duration_us - elapsed_us

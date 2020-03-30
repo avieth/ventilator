@@ -59,6 +59,9 @@ motor_velocity = velocity
   cmv_control :: CMVControl
   cmv_control = calibrated
 
+  spontaneous_breath :: SpontaneousBreath
+  spontaneous_breath = false
+
   velocity_main :: Stream Int32
   velocity_main =
     local Kinematics.volume_f $ \vf ->
@@ -73,13 +76,13 @@ motor_velocity = velocity
         else 0
 
   volume_goal :: Stream Double
-  volume_goal = unsafeCast (1000 * vmode_volume_ml (cmv cmv_control))
+  volume_goal = unsafeCast (1000 * vmode_volume_ml (cmv cmv_control spontaneous_breath))
 
   remaining_time_us :: Stream Word32
   remaining_time_us =
-    if vmode_interval_us (cmv cmv_control) <= 1000
+    if vmode_interval_us (cmv cmv_control spontaneous_breath) <= 1000
     then 1000
-    else vmode_interval_us (cmv cmv_control)
+    else vmode_interval_us (cmv cmv_control spontaneous_breath)
   remaining_time_s :: Stream Double
   remaining_time_s = unsafeCast remaining_time_us / 1000000.0
 

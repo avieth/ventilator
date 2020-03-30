@@ -12,4 +12,3 @@ void control_motor(int32_t us_per_pulse);
 void calibration_change(uint8_t calibration_change_arg0, double calibration_change_arg1, double calibration_change_arg2);
 void zero_encoder(void);
 void step(void);
-
