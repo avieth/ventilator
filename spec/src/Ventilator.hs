@@ -50,6 +50,15 @@ motor_velocity = velocity
 
   velocity = if calibrated then velocity_main else velocity_calibrate
 
+  -- Mask CMV until we are calibrated.
+  -- CMV will not count up while this is False.
+  -- When it flips to True it will begin counting and running its cycles.
+  -- It is durable against changes to this mask: any flip from False to True
+  -- will gracefully reset by exhaling to the desired PEEP and then beginning
+  -- again.
+  cmv_control :: CMVControl
+  cmv_control = calibrated
+
   velocity_main :: Stream Int32
   velocity_main =
     local Kinematics.volume_f $ \vf ->
@@ -64,13 +73,13 @@ motor_velocity = velocity
         else 0
 
   volume_goal :: Stream Double
-  volume_goal = unsafeCast (1000 * vmode_volume_ml cmv)
+  volume_goal = unsafeCast (1000 * vmode_volume_ml (cmv cmv_control))
 
   remaining_time_us :: Stream Word32
   remaining_time_us =
-    if vmode_interval_us cmv <= 1000
+    if vmode_interval_us (cmv cmv_control) <= 1000
     then 1000
-    else vmode_interval_us cmv
+    else vmode_interval_us (cmv cmv_control)
   remaining_time_s :: Stream Double
   remaining_time_s = unsafeCast remaining_time_us / 1000000.0
 

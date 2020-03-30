@@ -1,17 +1,22 @@
 packages:
   ventilator-spec.cabal
+  ../copilot-sbv/copilot-sbv.cabal
+  ../copilot-cbmc/copilot-cbmc.cabal
+  ../../copilot-c99/copilot-c99.cabal
+  ../../copilot-core/copilot-core.cabal
+  ../../copilot-language/copilot-language.cabal
 
-source-repository-package
-  type: git
-  location: https://github.com/avieth/copilot-core.git
-  tag: 71a1b1e55ffa616091639c0322f7df0572d17026
+--source-repository-package
+--  type: git
+--  location: https://github.com/avieth/copilot-core.git
+--  tag: 71a1b1e55ffa616091639c0322f7df0572d17026
 
-source-repository-package
-  type: git
-  location: https://github.com/avieth/copilot-language.git
-  tag: 4b883d1e6e222de0bd67f1996daa62a450d4e1dc
+--source-repository-package
+--  type: git
+--  location: https://github.com/avieth/copilot-language.git
+--  tag: 4b883d1e6e222de0bd67f1996daa62a450d4e1dc
 
-source-repository-package
-  type: git
-  location: https://github.com/avieth/copilot-c99.git
-  tag: 2e1412beb107bb856c3ac316c10fcd70bc49a176
+--source-repository-package
+--  type: git
+--  location: https://github.com/avieth/copilot-c99.git
+--  tag: 2e1412beb107bb856c3ac316c10fcd70bc49a176

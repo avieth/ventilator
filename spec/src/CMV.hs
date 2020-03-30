@@ -2,15 +2,22 @@
 {-# LANGUAGE DataKinds #-}
 
 module CMV
-  ( VMode (..)
+  ( CMVControl
+  , VMode (..)
   , cmv
   ) where
 
 import Language.Copilot
-import Prelude hiding ((++), (>=), (<), (<=), (||), div, not)
+import Prelude hiding ((++), (>=), (<), (<=), (||), (/=), (&&), div, not)
 import Controls
 import Cycle
 import Time
+
+-- | CMV control stream.
+-- When this is False, CMV does not count.
+-- When it goes to True, CMV exhales until the lower limit, then begins counting
+-- and runnings its cycle according to BPM and I:E ratio.
+type CMVControl = Stream Bool
 
 -- | Organizational record for a ventilation mode: it says what the volume
 -- goal is and how much time is left to reach it.
@@ -49,8 +56,8 @@ data CMVCycle = CMVCycle
 -- settings, and a commit button to start it on the next cycle.
 -- We also need sensible minimums: a BPM of less than 6 is probably not a great
 -- idea. Not all I:E ratios are sensible either.
-cmv_cycle :: CMVCycle
-cmv_cycle = CMVCycle
+cmv_cycle :: CMVControl -> CMVCycle
+cmv_cycle control = CMVCycle
   { cmv_subcycle = subcycle
   , cmv_current_length = current_length
   , cmv_current_elapsed = current_elapsed
@@ -66,18 +73,26 @@ cmv_cycle = CMVCycle
   -- BPM and I:E parameters.
 
   -- True whenever the subcycle should change.
-  change :: Stream Bool
-  change = current_elapsed >= current_length
+  subcycle_change :: Stream Bool
+  subcycle_change = current_elapsed >= current_length
 
   -- Hold the previous value unless the most recent elapsed time exceeds the
   -- length of the subcycle.
-  subcycle = [False] ++ if change then not subcycle else subcycle
+  subcycle = [False] ++
+    if control_change && control
+    then false
+    else if subcycle_change
+    then not subcycle
+    else subcycle
 
   -- Length of the current subcycle, determined by the UI parameters whenever
   -- it changes to inhale cycle.
   current_length = [0] ++ current_length'
   current_length' =
-    if change
+    if control_change && control
+    -- FIXME appropriate? CMV just came on, so we always start with exhale?
+    then exhale_duration_us
+    else if subcycle_change
     then if not subcycle
       -- it's going to change to the inhale cycle.
       then inhale_duration_us
@@ -86,9 +101,21 @@ cmv_cycle = CMVCycle
 
   current_elapsed = [0] ++ current_elapsed'
   current_elapsed' =
-    if change
+    if control_change && control
+    then 0
+    else if not control
+    then current_elapsed
+    else if subcycle_change
     then 0
     else current_elapsed + time_delta_us
+
+  -- The control stream with an initial value, so that we can detect a change.
+  control_last :: Stream Bool
+  control_last = [False] ++ control
+
+  -- True when the control stream changed.
+  control_change :: Stream Bool
+  control_change = control /= control_last
 
 -- | Continuous mandatory ventilation: fixed BPM and I:E ratio with either
 -- a pressure or volume goal.
@@ -98,21 +125,21 @@ cmv_cycle = CMVCycle
 -- TODO pressure control support.
 -- TODO should respect PEEP, whether in VC or PC mode.
 --
-cmv :: VMode
-cmv = VMode { vmode_volume_ml = volume_ml, vmode_interval_us = remaining_us }
+cmv :: CMVControl -> VMode
+cmv control = VMode { vmode_volume_ml = volume_ml, vmode_interval_us = remaining_us }
 
   where
 
   volume_ml :: Stream Word32
   volume_ml = if inhaling then cmv_volume_goal_limited else 0
 
-  inhaling = cmv_subcycle cmv_cycle
+  inhaling = cmv_subcycle (cmv_cycle control)
 
   duration_us :: Stream Word32
-  duration_us = cmv_current_length cmv_cycle
+  duration_us = cmv_current_length (cmv_cycle control)
 
   elapsed_us :: Stream Word32
-  elapsed_us = cmv_current_elapsed cmv_cycle
+  elapsed_us = cmv_current_elapsed (cmv_cycle control)
 
   remaining_us :: Stream Word32
   remaining_us = duration_us - elapsed_us
