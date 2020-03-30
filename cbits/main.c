@@ -68,6 +68,8 @@ int32_t s_volume = 0;
 bool s_piston_low = true;
 bool s_piston_high = false;
 
+int32_t s_encoder_position = 0;
+
 /**
  * Some constants and variables for simulation.
  *
@@ -169,15 +171,14 @@ const int32_t intrinsic_peep_cmh2o = 0;
  *
  * One problem with having the flow change instantaneously: 
  */
-void update_model(int8_t in_motor_velocity) {
-
+void update_model(bool in_motor_pulse, bool in_motor_direction) {
   /*
   static int8_t actual_motor_velocity = 0;
   if (actual_motor_velocity > in_motor_velocity) {
     actual_motor_velocity--;
   } else if (actual_motor_velocity < in_motor_velocity) {
     actual_motor_velocity++;
-  }*/
+  }
 
   // Compute the change in piston position. We have the speed in um/ms at full
   // duty cycle (in_motor_velocity is magnitude 127), and the time delta in ms,
@@ -210,16 +211,10 @@ void update_model(int8_t in_motor_velocity) {
   s_flow = (displacement_ul_um * d_position_um) / ((int32_t) t_delta_ms);
   // Volume is uL.
   s_volume += (((int32_t) t_delta_ms) * s_flow);
-  /*
-  static double fp_pressure = intrinsic_peep;
-  fp_pressure += (displacement * d_piston_position) / compliance;
-  s_pressure = round(fp_pressure);
-  s_internal_pressure_1 = s_pressure;
-  s_internal_pressure_2 = s_pressure;
-  */
   s_pressure += ((((int32_t) t_delta_ms) * s_flow) / compliance_ul_pa);
   s_internal_pressure_1 = s_pressure;
   s_internal_pressure_2 = s_pressure;
+  */
 }
 
 /**
@@ -227,8 +222,8 @@ void update_model(int8_t in_motor_velocity) {
  * velocity which the spec has decided upon. This routine would be required to
  * write that value to hardware so as to drive the motor.
  */
-void control_motor(int8_t in_motor_velocity) {
-  update_model(in_motor_velocity);
+void control_motor(bool in_motor_pulse, bool in_motor_direction, double in_volume) {
+  update_model(in_motor_pulse, in_motor_direction);
 }
 
 void raise_alarm(void) {
@@ -324,10 +319,13 @@ void input(void) {
  * an entire breath cycle.
  */
 void update_ui(
-    int32_t in_desired_flow
-  , int8_t in_motor
+    double in_desired_flow
+  , bool in_motor_pulse
+  , bool in_motor_direction
+  , double in_volume
   , bool in_piston_high
   , bool in_piston_low
+  , double piston_position
   , uint8_t in_bpm
   , uint32_t in_volume_limit
   , uint32_t in_pressure_limit
@@ -366,7 +364,7 @@ void update_ui(
   move(row, 0);
   clrtoeol();
   mvprintw(row, 0,
-      "BPM: %i, I:E set %i:%i, I:E actual %i:%i, time: %i ms, desired flow: %03i, motor vel: %03d, piston position: %e",
+      "BPM: %i, I:E set %i:%i, I:E actual %i:%i, time: %i ms, desired flow: %03i, piston position: %e",
       in_bpm,
       (c_ie_ratio >> 8),
       (c_ie_ratio & 0xFF),
@@ -374,7 +372,6 @@ void update_ui(
       in_ie_exhale,
       time_us / 1000,
       in_desired_flow,
-      in_motor,
       piston_position_um
   );
   row += 1;
@@ -461,7 +458,7 @@ void update_ui(
 
   int col = width - 2;
   int midpoint = rhs_height / 2;
-  int v_step = 256 / rhs_height;
+  /*int v_step = 256 / rhs_height;
   int v_motor = (int) in_motor;
   for (int i = 0; i < midpoint; ++i) {
     if (v_motor >= 0) {
@@ -487,7 +484,7 @@ void update_ui(
       row = 2 + midpoint - i;
       mvprintw(row, col, " ");
     }
-  }
+  }*/
 
   col = width - 1;
   int piston_step = cylinder_length_um / height;

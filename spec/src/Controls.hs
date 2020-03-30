@@ -245,8 +245,7 @@ cmv_mode = c_cmv_mode controls
 cmv_volume_goal_limited :: Stream Word32
 cmv_volume_goal_limited = Util.clamp lower upper (c_cmv_volume_goal controls)
   where
-  -- uL for 6ml/kg of a 40kg patient
-  lower = constant 240
+  lower = constant 0
   -- uL for 8mL/kg of a 200kg patient
   upper = constant 1600
 

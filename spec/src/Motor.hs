@@ -10,24 +10,30 @@ import Prelude hiding ((++), (<), (>), (>=), (&&), (/=), (==), div, drop, not)
 steps_per_rotation :: Stream Word32
 steps_per_rotation = constant 800
 
--- | How many degrees are traversed per step.
-degrees_per_step :: Stream Double
-degrees_per_step = constant 360.0 / unsafeCast steps_per_rotation
+-- | How many millidegrees are traversed per step.
+md_per_step :: Stream Word32
+md_per_step = constant 360000 `div` steps_per_rotation
 
--- | Organizational record for stepper motor pulse data: how many microseconds
--- between each pulse, and which direction.
-data PulseData = PulseData
-  { us_per_pulse    :: Stream Word32
-  , motor_direction :: Stream Bool
-  }
+-- | How many encoder pulses per revolution.
+-- TODO what is it actually? I don't have the encoder data sheet.
+pulses_per_rotation :: Stream Word32
+pulses_per_rotation = constant 2000
+
+-- | How many millidegrees per encoder pulse
+md_per_pulse :: Stream Word32
+md_per_pulse = constant 360000 `div` pulses_per_rotation
+
+-- | Microseconds per pulse, where the sign gives direction. 0 means no
+-- movement.
+type PulseData = Stream Int32
 
 -- | Given a desired degrees-per-second velocity, compute the microseconds
--- per pulse and direction bit.
+-- per pulse and direction (its sign).
 --
 -- Microseconds per pulse is 0 if the speed is 0.
 --
 pulse_data_from_velocity_dps :: Stream Int32 -> PulseData
-pulse_data_from_velocity_dps x_dps = PulseData rate direction
+pulse_data_from_velocity_dps x_dps = rate
 
   where
 
@@ -35,21 +41,12 @@ pulse_data_from_velocity_dps x_dps = PulseData rate direction
   -- per pulse is infinite.
   -- Instead, we set it to 0us, where 0us is understood to mean "do not rotate
   -- at all" rather than "rotate infinitely fast".
-
   rate = if x_dps == 0 then constant 0 else us_per_pulse
-  direction = if x_dps >= 0 then true else false
 
-  -- Unsafe cast should be fine: a degrees-per-second of higher than 2^31 is
-  -- quite ridiculous.
-  x_dps_unsigned :: Stream Word32
-  x_dps_unsigned = unsafeCast (abs x_dps)
-
-  -- TODO use configuration; 450 comes from 360000 / 800, for an 800 steps
-  -- per revolution motor.
-  pulses_per_second :: Stream Word32
+  pulses_per_second :: Stream Int32
   pulses_per_second =
-          (1000 * x_dps_unsigned * steps_per_rotation)
+          (1000 * x_dps * unsafeCast steps_per_rotation)
     `div` (constant 360000)
 
-  us_per_pulse :: Stream Word32
+  us_per_pulse :: Stream Int32
   us_per_pulse = 1000000 `div` pulses_per_second

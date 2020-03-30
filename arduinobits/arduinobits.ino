@@ -29,12 +29,12 @@ bool s_limit_low = false;
  * Operator controls (c_ prefix).
  * These are read by the ventilator system logic.
  */
-uint8_t c_bpm = 10;
+uint8_t c_bpm = 12;
 uint16_t c_ie_ratio = 0x0102;
 bool c_cmv_mode = true;
-uint32_t c_volume_limit = 1800;
+uint32_t c_volume_limit = 1000;
 uint32_t c_pressure_limit = 5000;
-uint32_t c_cmv_volume_goal = 500; //mL
+uint32_t c_cmv_volume_goal = 1000; //mL
 uint32_t c_cmv_pressure_goal = 3000;
 uint32_t c_peep = 200;
 
@@ -64,6 +64,12 @@ void setup() {
   digitalWrite(DIRECTION_PIN, HIGH);
   pinMode(LIMITSWITCH_PIN, INPUT_PULLUP);
   Serial.begin(9600);
+  long x = 0;
+  unsigned long y = 0;
+  double z = ((double) 60.0) / ((double) 1.25);
+  y = (unsigned long) z;
+  x = (long) y;
+  Serial.println(x);
 }
 
 /**
@@ -83,10 +89,16 @@ unsigned long pulse_us = 1250;
 
 /**
  * Set the motor pulse length and direction.
+ * Encoding is simple: magnitude give the us per pulse, sign gives the direction.
  */
-void control_motor(unsigned long in_us_per_pulse, bool in_direction) {
-  pulse_us = in_us_per_pulse;
-  motor_direction = in_direction;
+void control_motor(long in_us_per_pulse) {
+  if (in_us_per_pulse >= 0) {
+    pulse_us = in_us_per_pulse;
+    motor_direction = true;
+  } else {
+    pulse_us = -in_us_per_pulse;
+    motor_direction = false;
+  }
 }
 
 /**
@@ -98,6 +110,20 @@ void control_motor(unsigned long in_us_per_pulse, bool in_direction) {
 void step_motor() {
   static unsigned long time_since_last_pulse_us = 0;
   static bool current_direction = true;
+
+  /**
+   * Some debugging code: it's good to know if the motor stepper is "underrunning", i.e. not
+   * being called often enough, for instance because the system step function takes too long
+   * (floating point math p hard).
+   */
+  static unsigned long time_at_last_step_motor_us = 0;
+  static unsigned long now_us = micros();
+  if ((now_us - time_at_last_step_motor_us) > pulse_us) {
+    //Serial.println("xrun");
+    now_us = micros();
+  }
+  time_at_last_step_motor_us = now_us;
+  
   if (motor_direction != current_direction) {
     current_direction = motor_direction;
     if (current_direction) {
@@ -137,6 +163,16 @@ void zero_encoder() {
   s_encoder_position = 0;
 }
 
+void calibration_change(unsigned char in_c_phase, double in_theta, double in_volume) {
+  /*Serial.print(in_c_phase);
+  Serial.print(" : ");
+  Serial.print(encoder.read());
+  Serial.print(" : ");
+  Serial.print(in_theta);
+  Serial.print(" : ");
+  Serial.println(in_volume);*/
+}
+
 /**
  * Updating the system is resource-intensive.
  * 
@@ -164,6 +200,21 @@ void step_system() {
   }
 }
 
+#define DEBUG_INTERVAL 100000
+
+void debug() {
+  static unsigned long debug_elapsed_us = 0;
+  debug_elapsed_us += t_delta_us;
+  if (debug_elapsed_us >= DEBUG_INTERVAL) {
+    //Serial.println(s_encoder_position);
+    debug_elapsed_us = 0;
+  }
+}
+
+void update_ui(double in_flow, double in_volume, long in_pressure, unsigned char in_bpm, unsigned char in_inhale_ratio, unsigned char in_exhale_ratio, bool in_cmv_mode, unsigned long in_cmv_volume_goal, unsigned long in_cmv_pressure_goal) {
+  //Serial.println(in_flow);
+}
+
 /**
  * Main loop: track time, update the system, and crucially: call into step_motor as often as possible.
  */
@@ -171,4 +222,5 @@ void loop() {
   update_time();
   step_system();
   step_motor();
+  debug();
 }
