@@ -6,11 +6,11 @@
 /**
  * Sensors (analog pins).
  */
-#define PIN_INSP_PRESSURE 8
-#define PIN_EXP_PRESSURE 9
-#define PIN_INSP_FLOW 10
-#define PIN_EXP_FLOW 11
-#define PIN_AIR_IN_FLOW 12
+#define PIN_INSP_PRESSURE A0
+#define PIN_EXP_PRESSURE A1
+#define PIN_INSP_FLOW A2
+#define PIN_EXP_FLOW A3
+#define PIN_AIR_IN_FLOW A4
 
 /** 
  * Rotary encoder.
