@@ -20,9 +20,13 @@ int32_t s_encoder_position = 0;
 #define STEP_PIN 7
 
 /**
+ * Pins 8-12 reserved for sensors (see SensorHandler.h)
+ */
+
+/**
  * A switch to indicate 0 for the encoder.
  */
-#define LIMITSWITCH_PIN 12
+#define LIMITSWITCH_PIN 13
 
 bool s_limit_low = false;
 
@@ -40,6 +44,23 @@ uint32_t c_cmv_pressure_goal = 3000;
 uint32_t c_peep = 200;
 
 int32_t s_internal_pressure_1 = 0;
+
+/**
+ * Globals for sensor data.
+ * See update_sensors();
+ * TODO must these use floating points really?
+ * TODO units?
+ */
+ long s_insp_pressure_1 = 0;
+ long s_insp_pressure_2 = 0;
+ long s_exp_pressure_1 = 0;
+ long s_exp_pressure_2 = 0;
+ long s_insp_flow_1 = 0;
+ long s_insp_flow_2 = 0;
+ long s_exp_flow_1 = 0;
+ long s_exp_flow_2 = 0;
+ long s_air_in_flow_1 = 0;
+ long s_air_in_flow_2 = 0;
 
 /**
  * The time leapsed (in microseconds) since the last loop() call.
@@ -64,6 +85,7 @@ void setup() {
   pinMode(DIRECTION_PIN, OUTPUT);  
   digitalWrite(DIRECTION_PIN, HIGH);
   pinMode(LIMITSWITCH_PIN, INPUT_PULLUP);
+  initializeSensors();
   Serial.begin(9600);
 }
 
@@ -147,7 +169,18 @@ void update_sensors() {
   // decrease.
   s_encoder_position = -encoder.read();
   s_limit_low = digitalRead(LIMITSWITCH_PIN) == LOW;
-  //if (s_limit_low) { Serial.println("low"); }
+
+  // No redundant sensors so we just copy the values.
+  s_insp_pressure_1 = lroundf(getInspPressure());
+  s_insp_pressure_2 = s_insp_pressure_2;
+  s_exp_pressure_1 = lroundf(getExpPressure());
+  s_exp_pressure_2 = s_exp_pressure_1;
+  s_insp_flow_1 = lroundf(getInspFlow());
+  s_insp_flow_2 = s_insp_flow_1;
+  s_exp_flow_1 = lroundf(getExpFlow());
+  s_exp_flow_2 = s_exp_flow_1;
+  s_air_in_flow_1 = lroundf(getAirInFlow());
+  s_air_in_flow_2 = s_air_in_flow_1;
 }
 
 /**

@@ -7,7 +7,9 @@
 
 #include "Pressure_Sensors.h"
 
-#define CMH20TOPASCAL 98.0665; 
+#define PASCAL_PER_CM_H2O 98.0665
+
+#define SENSOR_COUNT 5
 
 #define INSPPRESSUREPIN 8
 #define EXPPRESSUREPIN 9
@@ -15,22 +17,46 @@
 #define EXPFLOWPIN 11
 #define AIRINFLOWPIN 12
 
-int inspPressureOffset = 0; 
-int expPressureOffset = 0; 
-int inspFlowOffset= 0; 
-int expFlowOffset = 0; 
-int airInFlowOffset = 0; 
+/**
+ * Indices in the offset and pin arrays.
+ */
+#define INSPPRESSURE 0
+#define EXPPRESSURE 1
+#define INSPFLOW 2
+#define EXPFLOW 3
+#define AIRINFLOW 4
+
+int sensor_offsets[SENSOR_COUNT] = { 0, 0, 0, 0, 0 };
+int sensor_pins[SENSOR_COUNT] = { INSPPRESSUREPIN, EXPPRESSUREPIN, INSPFLOWPIN, EXPFLOWPIN, AIRINFLOWPIN };
+
+/**
+ * Only call with one of the defined sensor names above.
+ * You get 0 otherwise.
+ */
+int read_sensor_with_offset(unsigned char sensor_id) {
+  if (sensor_id >= SENSOR_COUNT) {
+    return 0;
+  } else {
+    return read_sensor(sensor_pins[sensor_id]) - sensor_offsets[sensor_id];
+  }
+}
+
+/**
+ * This is 0.6x + 0.3y + 0.2z but without nasty fractional computation.
+ * We do 6x + 3y + 2*z and then divide by 10.
+ */
+long smooth(long x, long y, long z) {
+  return (6*x + 3*y + 2*z) / 10;
+}
 
 //INITIALIZATION 
 
 bool initializeSensors(){
-  
- inspPressureOffset = sensor_offset(INSPPRESSUREPIN);
- expPressureOffset = sensor_offset(EXPPRESSUREPIN);
- inspFlowOffset= sensor_offset(INSPFLOWPIN);
- expFlowOffset = sensor_offset(EXPFLOWPIN);
- airInFlowOffset = sensor_offset(AIRINFLOWPIN);
-  
+  sensor_offsets[INSPPRESSURE] = sensor_offset(sensor_pins[INSPPRESSURE]);
+  sensor_offsets[EXPPRESSURE]  = sensor_offset(sensor_pins[EXPPRESSURE]);
+  sensor_offsets[INSPFLOW]     = sensor_offset(sensor_pins[INSPFLOW]);
+  sensor_offsets[EXPFLOW]      = sensor_offset(sensor_pins[EXPFLOW]);
+  sensor_offsets[AIRINFLOW]    = sensor_offset(sensor_pins[AIRINFLOW]);
 }
 
 //SENSORS
@@ -39,8 +65,8 @@ int lastLastInspPressureReading = 0;
 
 float getInspPressure() {
 
-  int rawData = read_sensor(INSPPRESSUREPIN); 
-  float pressure = pressure_difference(inspPressureOffset, rawData); 
+  int rawData = read_sensor_with_offset(INSPPRESSURE);
+  float pressure = pressure_difference(rawData); 
 
   float inspPressure= 0.6f*pressure + 0.3f*lastInspPressureReading + 0.2f*lastLastInspPressureReading;   
   
@@ -55,8 +81,8 @@ int lastLastExpPressureReading = 0;
 
 float getExpPressure() {
 
-  int rawData = read_sensor(EXPPRESSUREPIN); 
-  float pressure = pressure_difference(expPressureOffset, rawData); 
+  int rawData = read_sensor_with_offset(EXPPRESSURE);
+  float pressure = pressure_difference(rawData); 
 
   float expPressure= 0.6f*pressure + 0.3f*lastExpPressureReading + 0.2f*lastLastExpPressureReading;   
   
@@ -71,8 +97,8 @@ int lastLastInspFlowReading = 0;
 
 float getInspFlow() {
 
-  int rawData = read_sensor(INSPFLOWPIN); 
-  float flow = flow_rate(inspFlowOffset, rawData); 
+  int rawData = read_sensor_with_offset(INSPFLOW);
+  float flow = flow_rate(rawData); 
 
   float inspFlow= 0.6f*flow + 0.3f*lastInspFlowReading + 0.2f*lastLastInspFlowReading;   
   
@@ -87,8 +113,8 @@ int lastLastExpFlowReading = 0;
 
 float getExpFlow() {
 
-  int rawData = read_sensor(EXPFLOWPIN); 
-  float flow = flow_rate(expFlowOffset, rawData); 
+  int rawData = read_sensor_with_offset(EXPFLOW);
+  float flow = flow_rate(rawData); 
 
   float expFlow= 0.6f*flow + 0.3f*lastExpFlowReading + 0.2f*lastLastExpFlowReading;   
   
@@ -104,8 +130,8 @@ int lastLastAirInFlowReading = 0;
 
 float getAirInFlow() {
 
-  int rawData = read_sensor(AIRINFLOWPIN); 
-  float flow = flow_rate(airInFlowOffset, rawData); 
+  int rawData = read_sensor_with_offset(AIRINFLOW);
+  float flow = flow_rate(rawData); 
 
   float airInFlow= 0.6f*flow + 0.3f*lastAirInFlowReading + 0.2f*lastLastAirInFlowReading;   
   

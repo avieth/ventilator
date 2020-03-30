@@ -45,32 +45,50 @@ oxygen_sensors = OxygenSensors
 
 -- | Organization record for sensors relating to pressure.
 --
--- TBD what will these be exactly and what are the units.
+-- TODO units?
 data PressureSensors = PressureSensors
-  { s_internal_pressure :: WithRedundancy Int32
+  { s_insp_pressure :: WithRedundancy Int32
+  , s_exp_pressure :: WithRedundancy Int32
   }
 
 pressure_sensors :: PressureSensors
 pressure_sensors = PressureSensors
-  { s_internal_pressure = WithRedundancy
-      { principal = extern "s_internal_pressure_1" Nothing
-      , redundant = extern "s_internal_pressure_2" Nothing
-      , threshold = extern "s_internal_pressure_t" Nothing
+  { s_insp_pressure = WithRedundancy
+      { principal = extern "s_insp_pressure_1" Nothing
+      , redundant = extern "s_insp_pressure_2" Nothing
+      , threshold = extern "s_insp_pressure_t" Nothing
+      }
+  , s_exp_pressure = WithRedundancy
+      { principal = extern "s_exp_pressure_1" Nothing
+      , redundant = extern "s_exp_pressure_2" Nothing
+      , threshold = extern "s_exp_pressure_t" Nothing
       }
   }
 
 -- | Organizational record for sensors relating to flow, for patient-initiated
 -- (spontaneous) breaths.
 data FlowSensors = FlowSensors
-  { s_flow_out :: WithRedundancy Int32
+  { s_insp_flow :: WithRedundancy Int32
+  , s_exp_flow :: WithRedundancy Int32
+  , s_air_in_flow :: WithRedundancy Int32
   }
 
 flow_sensors :: FlowSensors
 flow_sensors = FlowSensors
-  { s_flow_out = WithRedundancy
-    { principal = extern "s_flow_1" Nothing
-    , redundant = extern "s_flow_2" Nothing
-    , threshold = extern "s_flow_t" Nothing
+  { s_insp_flow = WithRedundancy
+    { principal = extern "s_insp_flow_1" Nothing
+    , redundant = extern "s_insp_flow_2" Nothing
+    , threshold = extern "s_insp_flow_t" Nothing
+    }
+  , s_exp_flow = WithRedundancy
+    { principal = extern "s_exp_flow_1" Nothing
+    , redundant = extern "s_exp_flow_2" Nothing
+    , threshold = extern "s_exp_flow_t" Nothing
+    }
+  , s_air_in_flow = WithRedundancy
+    { principal = extern "s_air_in_flow_1" Nothing
+    , redundant = extern "s_air_in_flow_2" Nothing
+    , threshold = extern "s_air_in_flow_t" Nothing
     }
   }
 
