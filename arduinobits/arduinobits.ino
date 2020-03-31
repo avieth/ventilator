@@ -1,23 +1,27 @@
 #include <Encoder.h>
 #include "pins.h"
-#include "SensorHandler.h"
+#include "sensor_control.h"
+#include "display_control.h"
+#include "input_control.h"
 #include "ventilator.c"
 
 Encoder encoder(PIN_ENC_0, PIN_ENC_1);
 
 int32_t s_encoder_position = 0;
 bool s_limit_low = false;
+bool s_limit_high = false;
 
 /**
  * Operator controls (c_ prefix).
  * These are read by the ventilator system logic.
  */
 uint8_t c_bpm = 12;
-uint16_t c_ie_ratio = 0x0102;
+uint8_t c_ie_inhale = 0x01;
+uint8_t c_ie_exhale = 0x02;
 bool c_cmv_mode = true;
 uint32_t c_volume_limit = 1000;
 uint32_t c_pressure_limit = 5000;
-uint32_t c_cmv_volume_goal = 1000; //mL
+uint32_t c_cmv_volume_goal = 500; //mL
 uint32_t c_cmv_pressure_goal = 3000;
 uint32_t c_peep = 200;
 
@@ -27,16 +31,14 @@ uint32_t c_peep = 200;
  * TODO must these use floating points really?
  * TODO units?
  */
- long s_insp_pressure_1 = 0;
- long s_insp_pressure_2 = 0;
- long s_exp_pressure_1 = 0;
- long s_exp_pressure_2 = 0;
- long s_insp_flow_1 = 0;
- long s_insp_flow_2 = 0;
- long s_exp_flow_1 = 0;
- long s_exp_flow_2 = 0;
- long s_air_in_flow_1 = 0;
- long s_air_in_flow_2 = 0;
+int32_t s_insp_pressure_1 = 0;
+int32_t s_insp_pressure_2 = 0;
+int32_t s_insp_flow_1 = 0;
+int32_t s_insp_flow_2 = 0;
+int32_t s_exp_flow_1 = 0;
+int32_t s_exp_flow_2 = 0;
+int32_t s_air_in_flow_1 = 0;
+int32_t s_air_in_flow_2 = 0;
 
 /**
  * The time leapsed (in microseconds) since the last loop() call.
@@ -57,12 +59,18 @@ void update_time() {
 }
 
 void setup() {
+  Serial.begin(115200);
   pinMode(PIN_MOTOR_STEP, OUTPUT);
   pinMode(PIN_MOTOR_DIRECTION, OUTPUT);
   digitalWrite(PIN_MOTOR_DIRECTION, HIGH);
-  pinMode(PIN_MOTOR_LIMIT_SWITCH, INPUT_PULLUP);
+  pinMode(PIN_LIMIT_SWITCH_LOWER, INPUT_PULLUP);
+  pinMode(PIN_LIMIT_SWITCH_UPPER, INPUT_PULLUP);
   initializeSensors();
-  Serial.begin(9600);
+  // Give the display state the relevant pointers, so it can edit them.
+  display_state *displayState = setup_display(c_bpm, c_cmv_volume_goal, c_cmv_pressure_goal, c_ie_inhale, c_ie_exhale);
+  // TODO FIXME should not need to set up inputs and recordings explicitly
+  // here; should be encapsulated in ui_setup or something.
+  inputs_setup(displayState, &c_bpm, &c_cmv_volume_goal, &c_cmv_pressure_goal, &c_ie_inhale, &c_ie_exhale);
 }
 
 /**
@@ -78,7 +86,7 @@ bool motor_direction = true;
  * determines the speed of revolution. It is also limited by hardware/physics.
  * Anything lower than 400 is probably not feasible.
  */
-unsigned long pulse_us = 1250;
+unsigned long pulse_us = 0;
 
 /**
  * Set the motor pulse length and direction.
@@ -111,8 +119,8 @@ void step_motor() {
    */
   static unsigned long time_at_last_step_motor_us = 0;
   static unsigned long now_us = micros();
-  if ((now_us - time_at_last_step_motor_us) > pulse_us) {
-    //Serial.println("xrun");
+  if ((pulse_us != 0) && ((now_us - time_at_last_step_motor_us) > pulse_us)) {
+    Serial.println("motor control underrun");
     now_us = micros();
   }
   time_at_last_step_motor_us = now_us;
@@ -144,18 +152,22 @@ void update_sensors() {
   // Am I doing direction wrong? I find that forward (positive) direction makes the encoder
   // decrease.
   s_encoder_position = -encoder.read();
-  s_limit_low = digitalRead(PIN_MOTOR_LIMIT_SWITCH) == LOW;
+  s_limit_low = digitalRead(PIN_LIMIT_SWITCH_LOWER) == LOW;
+  s_limit_high = digitalRead(PIN_LIMIT_SWITCH_UPPER) == LOW;
 
-  // No redundant sensors so we just copy the values.
-  s_insp_pressure_1 = lroundf(getInspPressure());
+  /** 
+   *  Sample the sensors and round them to integers.
+   *  We give 1000 times the values before rounding.
+   *  
+   *  No redundant sensors so we just copy the values.
+   */
+  s_insp_pressure_1 = lroundf(get_insp_pressure());
   s_insp_pressure_2 = s_insp_pressure_2;
-  s_exp_pressure_1 = lroundf(getExpPressure());
-  s_exp_pressure_2 = s_exp_pressure_1;
-  s_insp_flow_1 = lroundf(getInspFlow());
+  s_insp_flow_1 = lroundf(get_insp_flow());
   s_insp_flow_2 = s_insp_flow_1;
-  s_exp_flow_1 = lroundf(getExpFlow());
+  s_exp_flow_1 = lroundf(get_exp_flow());
   s_exp_flow_2 = s_exp_flow_1;
-  s_air_in_flow_1 = lroundf(getAirInFlow());
+  s_air_in_flow_1 = lroundf(get_air_in_flow());
   s_air_in_flow_2 = s_air_in_flow_1;
 }
 
@@ -168,13 +180,6 @@ void zero_encoder() {
 }
 
 void calibration_change(unsigned char in_c_phase, double in_theta, double in_volume) {
-  /*Serial.print(in_c_phase);
-  Serial.print(" : ");
-  Serial.print(encoder.read());
-  Serial.print(" : ");
-  Serial.print(in_theta);
-  Serial.print(" : ");
-  Serial.println(in_volume);*/
 }
 
 /**
@@ -210,13 +215,24 @@ void debug() {
   static unsigned long debug_elapsed_us = 0;
   debug_elapsed_us += t_delta_us;
   if (debug_elapsed_us >= DEBUG_INTERVAL) {
-    //Serial.println(s_encoder_position);
+    // Put periodic debug code here if you desire.
     debug_elapsed_us = 0;
   }
 }
 
-void update_ui(double in_flow, double in_volume, long in_pressure, unsigned char in_bpm, unsigned char in_inhale_ratio, unsigned char in_exhale_ratio, bool in_cmv_mode, unsigned long in_cmv_volume_goal, unsigned long in_cmv_pressure_goal) {
-  //Serial.println(in_flow);
+/**
+ * Values to be displayed are determines _solely_ by this function (its parameters).
+ * The UI can of course indicate changes to these values, but the actual values must be
+ * determined by the ventilator program.
+ * 
+ * The operator control variables (globals, c_ prefix) are modified by the UI input
+ * part. It's these values which the display state tracks. However, these are not the
+ * values which are necessarily displayed. They are always displayed when editing that
+ * value, but if it's not the value that the ventilator logic decides to use (maybe it's
+ * nonsense) then it will not be displayed.
+ */
+void update_ui(long in_flow, long in_volume, long in_pressure, unsigned char in_bpm, unsigned char in_inhale_ratio, unsigned char in_exhale_ratio, bool in_cmv_mode, unsigned long in_cmv_volume_goal, unsigned long in_cmv_pressure_goal) {
+  lcd_control(in_bpm, in_volume, in_pressure, in_inhale_ratio, in_exhale_ratio);
 }
 
 /**
@@ -226,5 +242,6 @@ void loop() {
   update_time();
   step_system();
   step_motor();
+  input_control(micros());
   debug();
 }
