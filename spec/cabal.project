@@ -14,4 +14,4 @@ source-repository-package
 source-repository-package
   type: git
   location: https://github.com/avieth/copilot-c99.git
-  tag: 278a9b5cafd17e907c74f322c94f35639a71abc5
+  tag: cb0863fbad1998343e058d52d601aedadf21b0ce
