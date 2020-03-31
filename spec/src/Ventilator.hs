@@ -14,8 +14,7 @@
  - extern declarations for all "extern" signals as well as all declared
  - triggers.
  -
- - The specification for this program is called `spec` and is found near the
- - top of the program text.
+ - The specification for this program is called `spec`.
  -}
 
 {-# LANGUAGE RebindableSyntax #-}
@@ -41,15 +40,31 @@ import Util
 
 import Motor
 
+-- | Motor pulse data: converts the degrees-per-second velocity into the
+-- time between pulses, using hard-coded properties of the particular motor
+-- and driver.
 pulsedata :: PulseData
 pulsedata = pulse_data_from_velocity_dps motor_velocity
 
+-- | Calculate the desired motor velocity at an instant (degrees-per-second).
+--
+-- This is the essence of the ventilator program.
+--
 motor_velocity :: Stream Int32
 motor_velocity = velocity
 
   where
 
-  velocity = if calibrated then velocity_main else velocity_calibrate
+  -- It's easy to see that the motor will not move unless it is safe to move.
+  -- FIXME safe_to_move needs to be characterized.
+  velocity =
+    if not safe_to_move
+    then 0
+    else if calibrated
+    then velocity_main
+    -- Calibration brings the piston all the way forward and then back, to
+    -- set the rotary encoder zero.
+    else velocity_calibrate
 
   -- Mask CMV until we are calibrated.
   -- CMV will not count up while this is False.
@@ -67,6 +82,9 @@ motor_velocity = velocity
   velocity_main =
     local Kinematics.volume_f $ \vf ->
       local (unsafeCast (unsafeCast dps :: Stream Int64) :: Stream Int32) $ \dps_v ->
+        -- TODO need to decide on a good decision for velocity. Cannot be too
+        -- resource intensive (computing a derivative involing sin, cos, sqrt
+        -- for instance).
         if (volume_goal - vf) >= 5000
         then dps_v
         else if (vf - volume_goal) >= 5000
@@ -84,16 +102,18 @@ motor_velocity = velocity
     if vmode_interval_us (cmv cmv_control spontaneous_breath) <= 1000
     then 1000
     else vmode_interval_us (cmv cmv_control spontaneous_breath)
+
   remaining_time_s :: Stream Double
   remaining_time_s = unsafeCast remaining_time_us / 1000000.0
 
   required_theta :: Stream Double
   required_theta = inverse_volume_delivered volume_goal
+
   d_theta :: Stream Double
   d_theta = theta - required_theta
+
   dps :: Stream Double
   dps = d_theta / remaining_time_s
-
 
   -- Device is calibrated once the low switch has been touched twice.
   calibrated :: Stream Bool
@@ -136,6 +156,35 @@ calibration_phase_next =
   then 3
   else calibration_phase
 
+-- | Give True whenever human intervention is required.
+--
+-- As seen in `spec`, this signal controls when the C function raise_alarm will
+-- be called. That function would probably sound a buzzer and flash some
+-- lights.
+--
+-- TODO the alarm should give a code to indicate which signals are inconsistent,
+-- so that the UI signal can use it.
+-- Also should probably distinguish between critical alarms which imply motor
+-- shutdown, and warnings which do not.
+--
+-- TODO an alarm in case the high sensor is true but desired volume or
+-- pressure was not reached.
+alarm :: Stream Bool
+alarm = foldr (||) (constant False) checks
+  where
+  checks = []
+
+-- | The motor will not move unless this is true.
+--
+-- For now it's false whenever there is an alarm.
+-- Will need something better moving forward.
+--
+-- TODO FIXME is it better to have the kill switch mean bring the piston back
+-- to 0 and stay there until the operator intervenes? Would probably not be
+-- good to kill the motor with a high volume and pressure in the system.
+safe_to_move :: Stream Bool
+safe_to_move = not alarm
+
 -- | The spec for the ventilator program.
 spec :: Spec
 spec = do
@@ -169,7 +218,7 @@ spec = do
     -- TODO use sensors.
       arg_named "flow"      $ (unsafeCast (unsafeCast (flow_f_observed time_delta_us Kinematics.volume_f) :: Stream Int64) :: Stream Int32)
     , arg_named "volume_ml" $ (unsafeCast (unsafeCast (volume_f / 1000.0) :: Stream Int64) :: Stream Int32)
-    , arg_named "pressure" $ principal (s_insp_pressure (s_pressure sensors))
+    , arg_named "pressure" $ insp_pressure_accumulator
 
     , arg_named "bpm_limited"    $ bpm_limited
     , arg_named "ie_inhale"      $ ie_inhale_limited
@@ -191,36 +240,3 @@ spec = do
 -- | Write out the spec to C in "ventilator.h" and "ventilator.c"
 gen_c :: IO ()
 gen_c = reify spec >>= compile "ventilator"
-
--- |
--- # Alarm signal
-
--- | Give True whenever human intervention is required.
---
--- As seen in `spec`, this signal controls when the C function raise_alarm will
--- be called. That function would probably sound a buzzer and flash some
--- lights.
---
--- TODO the alarm should give a code to indicate which signals are inconsistent,
--- so that the UI signal can use it.
--- Also should probably distinguish between critical alarms which imply motor
--- shutdown, and warnings which do not.
---
---
--- TODO an alarm in case the high sensor is true but desired volume or
--- pressure was not reached.
-alarm :: Stream Bool
-alarm = foldr (||) (constant False) checks
-  where
-  checks = []
-
--- | When the flow should be put to 0.
---
--- For now it's whenever there is an alarm. May need to be something nontrivial
--- moving forward.
---
--- TODO FIXME is it better to have the kill switch mean bring the piston back
--- to 0 and stay there until the operator intervenes? Would probably not be
--- good to kill the motor with a high volume and pressure in the system.
-kill_flow :: Stream Bool
-kill_flow = alarm

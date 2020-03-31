@@ -138,6 +138,19 @@ exhale_accumulator = sum `div` n
   n :: Stream Int32
   n = constant 8
 
+insp_pressure_accumulator :: Stream Int32
+insp_pressure_accumulator = sum `div` n
+  where
+  stream :: Stream Int32
+  stream = [0,0,0,0,0,0,0,0] ++ next
+  next :: Stream Int32
+  next = principal (s_insp_pressure (s_pressure sensors))
+  sum :: Stream Int32
+  sum =        stream + drop 1 stream + drop 2 stream + drop 3 stream
+      + drop 4 stream + drop 5 stream + drop 6 stream + drop 7 stream
+  n :: Stream Int32
+  n = constant 8
+
 
 -- | Use the inspiration flow to determine when an inhale happens.
 --

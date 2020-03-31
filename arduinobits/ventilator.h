@@ -1,12 +1,12 @@
 extern uint32_t t_delta_us;
 extern int32_t s_encoder_position;
+extern int32_t s_insp_pressure_1;
 extern bool s_limit_low;
 extern bool s_limit_high;
 extern int32_t s_insp_flow_1;
 extern uint8_t c_bpm;
 extern uint8_t c_ie_exhale;
 extern uint8_t c_ie_inhale;
-extern int32_t s_insp_pressure_1;
 extern bool c_cmv_mode;
 extern uint32_t c_cmv_volume_goal;
 extern uint32_t c_cmv_pressure_goal;

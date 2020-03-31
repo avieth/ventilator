@@ -8,8 +8,8 @@ import Sensors
 import Motor (md_per_pulse)
 
 -- Transposed from Colin's arduino sketch.
-
--- TODO can we make all of this integral?
+--
+-- FIXME can we make all of this integral?
 -- The idea is that all of the floating point stuff can be pre-computed, from
 -- the measurements of the system. A lookup table may be feasible...
 -- Leaving it in floating point is a safety hazard. Errors may accumulate over
@@ -25,6 +25,7 @@ bellows_diameter_mm = constant 102
 
 -- | Area of a circular cross section of the bellows.
 -- Will be used to compute volume.
+-- Pre-computed value is given.
 bellows_xsection_area_mm_2 :: Stream Double
 bellows_xsection_area_mm_2 = 8171.282492
 {-
@@ -51,16 +52,18 @@ start_position_mm = 60.0
 -- | Max is when fully exhaled.
 theta_max :: Stream Double
 theta_max = reverse_kinematics_at_start
-{- theta_max = reverse_kinematics (constant start_position_mm) -}
 
 -- | Min is when fully inhaled (cannot push any more air).
 theta_min :: Stream Double
 theta_min = reverse_kinematics_at_end
-{- theta_min = reverse_kinematics (constant (start_position_mm + bellows_length_mm)) -}
 
+-- | Precomputed highest angle (degrees). Could also use reverse_kinematics to
+-- get this but that is not cheap.
 reverse_kinematics_at_start :: Stream Double
 reverse_kinematics_at_start = constant 110.51730062094212
 
+-- | Precomputed lowest angle (degrees). Could also use reverse_kinematics to
+-- get this but that is not cheap.
 reverse_kinematics_at_end :: Stream Double
 reverse_kinematics_at_end = constant 30.67270509390627
 
@@ -91,10 +94,7 @@ big_l_squared_minus_l_squared = constant 7175.0
 -- Input is the degrees from 0 reference, i.e. degrees traversed by the motor
 -- in the "pushing air" direction.
 theta_from_encoder :: Stream Double -> Stream Double
-theta_from_encoder offset = 180.0 - (base + offset)
-  where
-  base :: Stream Double
-  base = reverse_kinematics (constant start_position_mm)
+theta_from_encoder offset = 180.0 - (reverse_kinematics_at_start + offset)
 
 -- | The volume delivered to the patient in cubic millimeters, given a
 -- standard right-hand-rule angle (see forward_kinematics_mm_3)
@@ -315,13 +315,3 @@ flow_f_observed t_d_us vol = deltas
   elapsed = [0] ++ if elapsed >= 100000
                    then elapsed + t_d_us - 100000
                    else elapsed + t_d_us
-
-{-
--- | Silly volume definition which does _not_ use any FP math.
-volume_i :: Stream Double
-volume_i = 1250.0 * unsafeCast offset
-  where
-  offset :: Stream Int32
-  offset = ((unsafeCast md_per_pulse) * encoder_pulses) `div` 1000
-  encoder_pulses = s_encoder_position (s_motor sensors)
--}

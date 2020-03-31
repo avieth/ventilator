@@ -46,6 +46,8 @@ pulse_data_from_velocity_dps x_dps =
 
   where
 
+  -- TODO audit and improve motor control w.r.t. integral resolution.
+
   -- Must guard against 0 velocity, in which case the number of microseconds
   -- per pulse is infinite.
   -- Instead, we set it to 0us, where 0us is understood to mean "do not rotate
