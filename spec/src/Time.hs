@@ -40,5 +40,5 @@ time_delta_us = [0] ++ c_time_delta_us time
 every_us :: Word32 -> Stream Bool
 every_us us = stream
   where
-  stream = [False] ++ (if elapsed >= constant us then true else false)
+  stream = elapsed >= constant us
   elapsed = [0] ++ (if stream then constant 0 else elapsed + time_delta_us)

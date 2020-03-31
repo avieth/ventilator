@@ -5,7 +5,7 @@ module Sensors where
 import Language.Copilot
 import Redundancy
 
-import Prelude hiding ((++), (&&), (>=), drop)
+import Prelude hiding ((++), (&&), (>=), div, drop)
 
 -- | Organizational record for sensors relating to the piston and motor.
 data MotorSensors = MotorSensors
@@ -25,7 +25,7 @@ data MotorSensors = MotorSensors
 motor_sensors :: MotorSensors
 motor_sensors = MotorSensors
   { s_limit_low        = extern "s_limit_low"  Nothing
-  , s_limit_high      = extern "s_limit_high" Nothing
+  , s_limit_high       = extern "s_limit_high" Nothing
   , s_encoder_position = extern "s_encoder_position" Nothing
   }
 
@@ -108,28 +108,64 @@ sensors = Sensors
   , s_flow     = flow_sensors
   }
 
+
+-- | TODO a good way to process a stream of noisy flow sensor values.
+inhale_accumulator :: Stream Int32
+inhale_accumulator = sum `div` n
+  where
+  -- Sensors values with 8 initial values, so we can compute the average of
+  -- the last 8.
+  stream :: Stream Int32
+  stream = [0,0,0,0,0,0,0,0] ++ next
+  next :: Stream Int32
+  next = principal (s_insp_flow (s_flow sensors))
+  sum :: Stream Int32
+  sum =        stream + drop 1 stream + drop 2 stream + drop 3 stream
+      + drop 4 stream + drop 5 stream + drop 6 stream + drop 7 stream
+  n :: Stream Int32
+  n = constant 8
+
+exhale_accumulator :: Stream Int32
+exhale_accumulator = sum `div` n
+  where
+  stream :: Stream Int32
+  stream = [0,0,0,0,0,0,0,0] ++ next
+  next :: Stream Int32
+  next = principal (s_exp_flow (s_flow sensors))
+  sum :: Stream Int32
+  sum =        stream + drop 1 stream + drop 2 stream + drop 3 stream
+      + drop 4 stream + drop 5 stream + drop 6 stream + drop 7 stream
+  n :: Stream Int32
+  n = constant 8
+
+
 -- | Use the inspiration flow to determine when an inhale happens.
 --
--- Initial sketch: if it's past a threshold for 3 consecutive samples then
--- it's an inhale.
+-- Initial idea: the average of the last 4 samples must be above a threshold?
 inhale :: Stream Bool
-inhale = is_high && drop 1 is_high && drop 2 is_high
+inhale = inhale_accumulator >= threshold
   where
-  is_high = [False, False, False, False] ++ sensor_is_high
-  sensor_is_high = principal (s_insp_flow (s_flow sensors)) >= threshold
   -- TODO good threshold?
   threshold :: Stream Int32
-  threshold = constant 16
+  threshold = constant 8
+
+exhale :: Stream Bool
+exhale = exhale_accumulator >= threshold
+  where
+  threshold :: Stream Int32
+  threshold = constant 8
 
 -- | The low switch for the motor must read True twice in a row in order
 -- to give True.
 low_switch :: Stream Bool
-low_switch = stream
-
+low_switch = sensor && drop 1 sensor
   where
-
-  stream :: Stream Bool
-  stream = sensor && drop 1 sensor
-
   sensor :: Stream Bool
   sensor = [False, False] ++ s_limit_low (s_motor sensors)
+
+-- | Like `low_switch`.
+high_switch :: Stream Bool
+high_switch = sensor && drop 1 sensor
+  where
+  sensor :: Stream Bool
+  sensor = [False, False] ++ s_limit_high (s_motor sensors)

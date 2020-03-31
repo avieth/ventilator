@@ -15,13 +15,13 @@ let ventilator-spec-src = ./ventilator-spec.nix;
       repo = "copilot-language";
       rev = "66413fde4eeff7ba28d3bd7c1a144cff5862f633";
       sha256 = "0zk5dnii77dvkn630c1iabdk305jwcxsvfxkry6l71hj0gik8fi3";
-    };    
+    };
     copilot-c99-repo = fetchFromGitHub {
       owner = "avieth";
       repo = "copilot-c99";
-      rev = "bc49490993734979ed4dd862383ca67c099aaf53";
-      sha256 = "0gy0zxz6g780g8hrqllj37r633sfdayg6k1i115c9bzs7hrbipyh";
-    };    
+      rev = "cb0863fbad1998343e058d52d601aedadf21b0ce";
+      sha256 = "0z6rrxljmbjfykldfcvw6m35kq4g5k7wd0kn49h955xayja7hiap";
+    };
 
     copilot-core-src = copilot-core-repo + /copilot-core.nix;
     copilot-language-src = copilot-language-repo + /copilot-language.nix;

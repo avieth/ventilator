@@ -9,7 +9,7 @@ module CMV
   ) where
 
 import Language.Copilot
-import Prelude hiding ((++), (>=), (<), (<=), (||), (/=), (&&), div, not)
+import Prelude hiding ((++), (>=), (<), (<=), (||), (/=), (&&), div, drop, not)
 import Controls
 import Cycle
 import Time
@@ -71,64 +71,50 @@ cmv_cycle control spontaneous_breath = CMVCycle
 
   where
 
-  -- Initial values for this triple are
-  --   Exhale cycle (False)
-  --   0 length
-  --   0 time elapsed
-  -- and the system will immediately flip into the inhale subcycle using the
-  -- BPM and I:E parameters.
-
-  -- True whenever the subcycle should change due to time.
-  subcycle_change :: Stream Bool
-  subcycle_change = current_elapsed >= current_length
-
   -- The subcycle: true means inhaling, false means exhaling.
-  -- Hold the previous value unless there is a reason to change:
-  -- - the subcycle time is over
-  -- - the control mask changed from false to true
-  -- - the spontaneous breath stream is true and we're currently exhaling
+  subcycle :: Stream Bool
   subcycle = [False] ++
-    if control_change && control
-    then false
-    -- If the patient takes a breath and we're in the exhale phase, change
-    -- to inhale.
-    else if spontaneous_breath && not subcycle
-    then not subcycle
-    else if subcycle_change
+    if should_change
     then not subcycle
     else subcycle
 
+  -- When to change subcyles:
+  should_change :: Stream Bool
+  should_change =
+    -- Neever change if the mask is false.
+    if not control
+    then false
+    -- When the mask becomes true, enter the exhale phase.
+    else if control && not control_last
+    then false
+    -- When the subcycle has expired normally, change to the other subcycle.
+    else if subcycle_time_over
+    then true
+    -- If there is a spontaneous breath and we've been in the exhale phase for
+    -- over 1 second. TODO tune this, make configurable?
+    else if spontaneous_breath && not subcycle && current_elapsed >= 1000000
+    then true
+    else false
+
   -- Length of the current subcycle, determined by the UI parameters whenever
   -- it changes to inhale cycle.
-  current_length = [0] ++ current_length'
-  current_length' =
-    if control_change && control
-    -- FIXME appropriate? CMV just came on, so we always start with exhale?
-    then exhale_duration_us
-    else if subcycle_change
-    then if not subcycle
-      -- it's going to change to the inhale cycle.
-      then inhale_duration_us
-      else exhale_duration_us
-    else current_length
+  current_length =
+    if subcycle
+    then inhale_duration_us
+    else exhale_duration_us
 
-  current_elapsed = [0] ++ current_elapsed'
-  current_elapsed' =
-    if control_change && control
-    then 0
-    else if not control
-    then current_elapsed
-    else if subcycle_change
+  current_elapsed = [0] ++
+    if should_change
     then 0
     else current_elapsed + time_delta_us
+
+  -- True whenever the subcycle should change due to time.
+  subcycle_time_over :: Stream Bool
+  subcycle_time_over = current_elapsed >= current_length
 
   -- The control stream with an initial value, so that we can detect a change.
   control_last :: Stream Bool
   control_last = [False] ++ control
-
-  -- True when the control stream changed.
-  control_change :: Stream Bool
-  control_change = control /= control_last
 
 -- | Continuous mandatory ventilation: fixed BPM and I:E ratio with either
 -- a pressure or volume goal.

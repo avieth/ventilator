@@ -21,6 +21,12 @@ clamp lower upper x =
   then upper
   else x
 
+max :: (Ord a, Typed a) => Stream a -> Stream a -> Stream a
+max a b = if a >= b then a else b
+
+min :: (Ord a, Typed a) => Stream a -> Stream a -> Stream a
+min a b = if a <= b then a else b
+
 -- | Integrate a stream with a given initial value.
 integral :: (Num a, Eq a, Typed a) => a -> Stream a -> Stream a
 integral c s = stream

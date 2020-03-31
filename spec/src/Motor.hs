@@ -3,7 +3,10 @@
 module Motor where
 
 import Language.Copilot
-import Prelude hiding ((++), (<), (>), (>=), (&&), (/=), (==), div, drop, not)
+import Prelude hiding ((++), (<), (>), (>=), (&&), (/=), (==), div, drop, not,
+  min, max)
+
+import Sensors (high_switch, low_switch)
 
 -- | How many steps per revolution. This will be known and static for the
 -- device, so is not really a configuration variable.
@@ -15,9 +18,8 @@ md_per_step :: Stream Word32
 md_per_step = constant 360000 `div` steps_per_rotation
 
 -- | How many encoder pulses per revolution.
--- TODO what is it actually? I don't have the encoder data sheet.
 pulses_per_rotation :: Stream Word32
-pulses_per_rotation = constant 2000
+pulses_per_rotation = constant 2048
 
 -- | How many millidegrees per encoder pulse
 md_per_pulse :: Stream Word32
@@ -32,8 +34,15 @@ type PulseData = Stream Int32
 --
 -- Microseconds per pulse is 0 if the speed is 0.
 --
+-- Uses the high and low switches to clamp the rate so that it does not
+-- move backwards when the low switch is on, for instance.
 pulse_data_from_velocity_dps :: Stream Int32 -> PulseData
-pulse_data_from_velocity_dps x_dps = rate
+pulse_data_from_velocity_dps x_dps =
+  if low_switch && (rate < 0)
+  then 0
+  else if high_switch && (rate > 0)
+  then 0
+  else rate
 
   where
 

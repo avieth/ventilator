@@ -8,9 +8,8 @@ module Controls
   , error_controls
 
   , bpm_limited
-  , ie_ratio_limited
-  , ie_inhale
-  , ie_exhale
+  , ie_inhale_limited
+  , ie_exhale_limited
 
   , volume_limit_limited
   , pressure_limit_limited
@@ -28,7 +27,7 @@ module Controls
   , global_pressure_max
   ) where
 
-import Prelude hiding ((==), (>), (>=), (<=), div)
+import Prelude hiding ((==), (>), (>=), (<=), div, mod)
 import Language.Copilot
 
 import qualified Util as Util (clamp)
@@ -37,20 +36,11 @@ import qualified Util as Util (clamp)
 data Controls = Controls
   { -- | Breaths per minute.
     c_bpm                :: Stream Word8
-    -- | Ratio of inhale time to exhale time.
-    --
-    -- Ideally we would use a struct for this, but copilot support for
-    -- structs seems lacking: you cannot really do
-    --
-    --   Stream SomeStruct -> Stream SomeStruct
-    --
-    -- so we'll use a uint16_t where the high bits are inhale, low bits are
-    -- exhale.
-    --
-    -- Should not use this directy, but rather ie_ratio_limited, because this
-    -- represents the raw user control choice which may not make any sense (0s
-    -- for example).
-  , c_ie_ratio           :: Stream IERatio
+
+    -- | I:E ratio numerator: inhale
+  , c_ie_inhale :: Stream Word8
+    -- | I:E ratio denominator: exhale
+  , c_ie_exhale :: Stream Word8
 
     -- | Global limit on the volume in the lungs (mL).
   , c_volume_limit       :: Stream Word32
@@ -71,7 +61,8 @@ data Controls = Controls
 controls :: Controls
 controls = Controls
   { c_bpm               = extern "c_bpm"               Nothing
-  , c_ie_ratio          = extern "c_ie_ratio"          Nothing
+  , c_ie_inhale         = extern "c_ie_inhale"         Nothing
+  , c_ie_exhale         = extern "c_ie_exhale"         Nothing
   , c_volume_limit      = extern "c_volume_limit"      Nothing
   , c_pressure_limit    = extern "c_pressure_limit"    Nothing
   , c_peep              = extern "c_peep"              Nothing
@@ -168,67 +159,24 @@ peep_limited =
   minP = 0
   peep = c_peep controls
 
--- | Inhale/exhale ratio: numerator (inhale) in high 8 bits, denominator
--- (exhale) in low 8 bits.
---
--- Would like to use a struct but copilot doesn't work so well with those.
-type IERatio = Word16
-
--- | Gives the numerator and denominator of the I:E ratio subject to limits:
---
--- - neither is 0. If either is 0 it's set to 1.
--- - either can be greater (it is indeed possible to do longer inhales) but
---   the greater one is not more than 4 times the lesser one.
---
--- TODO revisit this. What are sensible constraints?
-ie_ratio_limited :: Stream IERatio
-ie_ratio_limited = ier_limited
-
+-- | The inhale portion of the I:E ratio is constrained by the exhale
+-- portion, and may not be 0.
+ie_inhale_limited :: Stream Word8
+ie_inhale_limited =
+  if ie_exhale_limited <= (4 * operator_choice)
+  then operator_choice
+  else if (ie_exhale_limited `mod` 4) == 0
+  then ie_exhale_limited `div` 4
+  else (ie_exhale_limited `div` 4) + 1
   where
+  operator_choice = c_ie_inhale controls
 
-  ier :: Stream IERatio
-  ier = c_ie_ratio controls
-
-  ier_limited :: Stream IERatio
-  ier_limited =
-        ((cast inhale :: Stream Word16) .<<. constant (8 :: Word8))
-    .|. ((cast exhale :: Stream Word16) .&. 0x00FF)
-
-  inhale :: Stream Word8
-  inhale =
-    if numerator_nz > denominator_nz
-    then if numerator_nz > (constant 4 * denominator_nz)
-      then constant 4 * denominator_nz
-      else numerator_nz
-    else numerator_nz
-
-  exhale :: Stream Word8
-  exhale =
-    if denominator_nz > numerator_nz
-    then if denominator_nz > (constant 4 * numerator_nz)
-      then constant 4 * numerator_nz
-      else denominator_nz
-    else denominator_nz
-
-  numerator_nz :: Stream Word8
-  numerator_nz = if numerator == 0 then 1 else numerator
-
-  denominator_nz :: Stream Word8
-  denominator_nz = if denominator == 0 then 1 else denominator
-
-  -- Cast is unsafe because it's Word16 -> Word8, but we right-shifted so it's
-  -- all good.
-  numerator :: Stream Word8
-  numerator = unsafeCast (ier .>>. constant (8 :: Word8))
-
-  denominator :: Stream Word8
-  denominator = unsafeCast (ier .&. 0x00FF)
-
-ie_inhale :: Stream Word8
-ie_inhale = unsafeCast (ie_ratio_limited .>>. constant (8 :: Word8))
-
-ie_exhale :: Stream Word8
-ie_exhale = unsafeCast (ie_ratio_limited .&. 0x00FF)
+-- | The exhale part of the I:E ratio may be anything other than 0.
+-- The inhale portion will be constrained by this.
+ie_exhale_limited :: Stream Word8
+ie_exhale_limited = if operator_choice <= 0 then 1 else operator_choice
+  where
+  operator_choice = c_ie_exhale controls
 
 -- | No sanity checking to do here, just give the control stream.
 cmv_mode :: Stream Bool

@@ -33,6 +33,7 @@ import Prelude hiding ((++), (&&), (>), (>=), (<), (<=), (||), (==), (/=), div,
 
 import Controls
 import Sensors
+import Redundancy (principal)
 import CMV
 import Kinematics
 import Time
@@ -70,9 +71,9 @@ motor_velocity = velocity
         then dps_v
         else if (vf - volume_goal) >= 5000
         -- For exhale we'll go faster, subject to a minimum speed
-        then if (dps_v * 8) > (-25)
-          then -25
-          else (dps_v * 8)
+        then if (dps_v * 4) > (-30)
+          then -30
+          else (dps_v * 4)
         else 0
 
   volume_goal :: Stream Double
@@ -129,7 +130,7 @@ calibration_phase_next =
   then 1
   -- Second phase: move until we cannot move any more (theta decreases as we
   -- move forward).
-  else if (calibration_phase == 1) && (theta <= theta_min)
+  else if (calibration_phase == 1) && high_switch
   then 2
   else if (calibration_phase == 2) && low_switch
   then 3
@@ -158,24 +159,21 @@ spec = do
     [ arg_named "us_per_pulse" pulsedata
     ]
 
-  -- At most once every 100ms update the UI.
-  trigger "update_ui" (every_us 100000) [
+  -- Update the UI, subject to rate limiting because it may be too expensive.
+  trigger "update_ui" (every_us 200000) [
 
     -- Key stats for the operator: flow, volume, and pressure.
-    -- pressure left unimplemented for now.
     -- volume is computed as usual from the motor position.
     -- flow is taken to be the change in volume at the current motor
     -- velocity.
-      --arg_named "flow"     $ flow_f motor_velocity
-      -- TODO FIXME do not recompute volume_f.
-      -- Must find a way to cache that.
-      arg_named "flow"     $ flow_f_observed time_delta_us Kinematics.volume_f
-    , arg_named "volume"   $ volume_f
-    , arg_named "pressure" $ (constant 0 :: Stream Int32)
+    -- TODO use sensors.
+      arg_named "flow"      $ (unsafeCast (unsafeCast (flow_f_observed time_delta_us Kinematics.volume_f) :: Stream Int64) :: Stream Int32)
+    , arg_named "volume_ml" $ (unsafeCast (unsafeCast (volume_f / 1000.0) :: Stream Int64) :: Stream Int32)
+    , arg_named "pressure" $ principal (s_insp_pressure (s_pressure sensors))
 
     , arg_named "bpm_limited"    $ bpm_limited
-    , arg_named "ie_inhale"      $ ie_inhale
-    , arg_named "ie_exhale"      $ ie_exhale
+    , arg_named "ie_inhale"      $ ie_inhale_limited
+    , arg_named "ie_exhale"      $ ie_exhale_limited
 
     , arg_named "cmv_mode"          $ cmv_mode
     , arg_named "cmv_volume_goal"   $ cmv_volume_goal_limited

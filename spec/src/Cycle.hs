@@ -29,7 +29,7 @@ cycle_duration_us = constant 60000000 `div` bpm
 -- the difference between the cycle duration and this value, so that loss due
 -- to integral division is accounted for in exhale.
 inhale_duration_us :: Stream Word32
-inhale_duration_us = (if x == 0 then 1 else x) * (cast ie_inhale :: Stream Word32)
+inhale_duration_us = (if x == 0 then 1 else x) * (cast ie_inhale_limited :: Stream Word32)
   where
   -- This division is OK. ie_inhale + ie_exhale is at most 383 (255 + 128)
   -- and the cycle duration has to be significantly larger than that.
@@ -37,7 +37,7 @@ inhale_duration_us = (if x == 0 then 1 else x) * (cast ie_inhale :: Stream Word3
   -- per cycle, which is probably at least 1e6 (1 breath per second).
   -- FIXME get advice of professionals on that limit.
   x :: Stream Word32
-  x = cycle_duration_us `div` (cast (ie_inhale + ie_exhale) :: Stream Word32)
+  x = cycle_duration_us `div` (cast (ie_inhale_limited + ie_exhale_limited) :: Stream Word32)
 
 -- | Exhale duration. Sum of this and inhale_duration is cycle_duration_us.
 -- Could also use a similar computation to inhale_duration_us, but we'd rather
