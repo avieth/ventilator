@@ -9,18 +9,18 @@
 
 #define BREATHRATE_INCREMENT          1
 #define TIDALVOLUME_INCREMENT         10
-#define PPEAK_INCREMENT               1.0
+#define PPEAK_INCREMENT               98.0
 
 // TODO not necessary; this is expressed in the
 // ventilator logic itself, the UI should simply
 // obey what it's told.
 #define MAX_BREATHRATE                40
 #define MAX_TIDALVOLUME               999
-#define MAX_PPEAK                     40.0
+#define MAX_PPEAK                     4000.0
 
 #define MIN_BREATHRATE                1
 #define MIN_TIDALVOLUME               300
-#define MIN_PPEAK                     5.0
+#define MIN_PPEAK                     0.0
 #define MIN_IERATIO                   1
 
 
@@ -313,7 +313,8 @@ void read_inputs(long currentTime, int timerReset){
       // TODO factor this out into its own routine for clarity: commits the changes.
       *(inputState.bpm) = inputState.input_display_state->breathRate;
       *(inputState.volume) = inputState.input_display_state->tidalVolume;
-      *(inputState.pressure) = inputState.input_display_state->pPeak;
+      // Input is in cm water, device uses Pa.
+      *(inputState.pressure) = 98 * inputState.input_display_state->pPeak;
       *(inputState.ie_inhale) = inputState.input_display_state->ieInhale;
       *(inputState.ie_exhale) = inputState.input_display_state->ieExhale;
 

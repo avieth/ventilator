@@ -144,6 +144,8 @@ void load_display(displayBlock lcd[], uint8_t in_bpm, uint32_t in_volume, uint32
   cursorState = (displayState.cursorActive && displayState.cursorIndex == 2) ? 1 : 0;
   lcd[index].valueSet = (displayState.valueSet == 0 && cursorState) ? 0 : 1;
   uint32_t pressure_to_display = (lcd[index].valueSet == 1) ? in_pressure : displayState.pPeak;
+  // It's in Pa; convert to cm water, approximately.
+  pressure_to_display = pressure_to_display / 98;
   int_to_display(pressure_to_display, lcd[index].blockArray, index, cursorState);
   index++;
   

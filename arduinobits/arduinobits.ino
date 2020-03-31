@@ -22,7 +22,7 @@ bool c_cmv_mode = true;
 uint32_t c_volume_limit = 1000;
 uint32_t c_pressure_limit = 5000;
 uint32_t c_cmv_volume_goal = 500; //mL
-uint32_t c_cmv_pressure_goal = 3000;
+uint32_t c_cmv_pressure_goal = 2000; //Pa
 uint32_t c_peep = 200;
 
 /**
@@ -163,6 +163,9 @@ void update_sensors() {
    */
   s_insp_pressure_1 = lroundf(get_insp_pressure());
   s_insp_pressure_2 = s_insp_pressure_2;
+  if (s_insp_pressure_1 > 0) {
+    Serial.println(s_insp_pressure_1);
+  }
   s_insp_flow_1 = lroundf(get_insp_flow());
   s_insp_flow_2 = s_insp_flow_1;
   s_exp_flow_1 = lroundf(get_exp_flow());
