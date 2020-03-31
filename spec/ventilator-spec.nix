@@ -3,9 +3,9 @@ mkDerivation {
   pname = "ventilator-spec";
   version = "0.1.0.0";
   src = ./.;
-  isLibrary = false;
+  isLibrary = true;
   isExecutable = true;
-  executableHaskellDepends = [ base copilot copilot-c99 ];
+  libraryHaskellDepends = [ base copilot copilot-c99 ];
+  executableHaskellDepends = [ base ];
   license = stdenv.lib.licenses.bsd3;
-  hydraPlatforms = stdenv.lib.platforms.none;
 }
