@@ -118,4 +118,4 @@ are at the moment not checked for unacceptable loss of accuracy.
 
 ## API Description
 
-See the [generated docs](./spec/docs/index.html).
+There are [generated docs](./spec/docs/) to be viewed in any web browser.
