@@ -1,6 +1,21 @@
 {-# LANGUAGE RebindableSyntax #-}
 
-module Sensors where
+module Sensors
+  ( sensors
+  , Sensors (..)
+  , MotorSensors (..)
+  , low_switch
+  , high_switch
+  , FlowSensors (..)
+  , inhale_accumulator
+  , exhale_accumulator
+  , PressureSensors (..)
+  , insp_pressure_accumulator
+  , inhale
+  , exhale
+  , accumulator
+  , OxygenSensors (..)
+  ) where
 
 import Language.Copilot
 import Redundancy
@@ -100,6 +115,8 @@ data Sensors = Sensors
   , s_flow     :: FlowSensors
   }
 
+-- | Sensor streams, all of which are "external", i.e. must be provided by
+-- the hardware/firmware.
 sensors :: Sensors
 sensors = Sensors
   { s_motor    = motor_sensors
@@ -108,60 +125,39 @@ sensors = Sensors
   , s_flow     = flow_sensors
   }
 
+-- | Take the average of a stream over 8 samples.
+accumulator :: Stream Int32 -> Stream Int32
+accumulator x = sum `div` constant 8
+  where
+  stream = [0,0,0,0,0,0,0,0] ++ x
+  sum :: Stream Int32
+  sum =        stream + drop 1 stream + drop 2 stream + drop 3 stream
+      + drop 4 stream + drop 5 stream + drop 6 stream + drop 7 stream
 
--- | TODO a good way to process a stream of noisy flow sensor values.
+-- | Accumulated (averaged) inhale flow sensors.
 inhale_accumulator :: Stream Int32
-inhale_accumulator = sum `div` n
-  where
-  -- Sensors values with 8 initial values, so we can compute the average of
-  -- the last 8.
-  stream :: Stream Int32
-  stream = [0,0,0,0,0,0,0,0] ++ next
-  next :: Stream Int32
-  next = principal (s_insp_flow (s_flow sensors))
-  sum :: Stream Int32
-  sum =        stream + drop 1 stream + drop 2 stream + drop 3 stream
-      + drop 4 stream + drop 5 stream + drop 6 stream + drop 7 stream
-  n :: Stream Int32
-  n = constant 8
+inhale_accumulator = accumulator . principal . s_insp_flow . s_flow $ sensors
 
+-- | Accumulated (averaged) exhale flow sensors.
 exhale_accumulator :: Stream Int32
-exhale_accumulator = sum `div` n
-  where
-  stream :: Stream Int32
-  stream = [0,0,0,0,0,0,0,0] ++ next
-  next :: Stream Int32
-  next = principal (s_exp_flow (s_flow sensors))
-  sum :: Stream Int32
-  sum =        stream + drop 1 stream + drop 2 stream + drop 3 stream
-      + drop 4 stream + drop 5 stream + drop 6 stream + drop 7 stream
-  n :: Stream Int32
-  n = constant 8
+exhale_accumulator = accumulator . principal . s_exp_flow . s_flow $ sensors
 
+-- | Accumulated (averaged) inspiration pressure sensor.
 insp_pressure_accumulator :: Stream Int32
-insp_pressure_accumulator = sum `div` n
-  where
-  stream :: Stream Int32
-  stream = [0,0,0,0,0,0,0,0] ++ next
-  next :: Stream Int32
-  next = principal (s_insp_pressure (s_pressure sensors))
-  sum :: Stream Int32
-  sum =        stream + drop 1 stream + drop 2 stream + drop 3 stream
-      + drop 4 stream + drop 5 stream + drop 6 stream + drop 7 stream
-  n :: Stream Int32
-  n = constant 8
+insp_pressure_accumulator = accumulator . principal . s_insp_pressure . s_pressure $ sensors
 
-
--- | Use the inspiration flow to determine when an inhale happens.
+-- | True when an inhale has been detected: whenever `inhale_accumulator`
+-- is greater or equal to 8.
 --
--- Initial idea: the average of the last 4 samples must be above a threshold?
+-- TODO good threshold
 inhale :: Stream Bool
 inhale = inhale_accumulator >= threshold
   where
-  -- TODO good threshold?
   threshold :: Stream Int32
   threshold = constant 8
 
+-- | True when an exhale has been detected: whenever `exhale_accumulator`
+-- is greater or equal to 8.
 exhale :: Stream Bool
 exhale = exhale_accumulator >= threshold
   where

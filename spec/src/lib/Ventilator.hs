@@ -1,21 +1,21 @@
 {-|
- - This is a [copilot](https://copilot-language.github.io/) program designed
- - to control a mechanical ventilatilation system.
- -
- - The program works with data streams (type `Stream Int32` for instance),
- - some of which are "extern" (set by a C program), and it defines "triggers",
- - which correspond to C functions which will be called whenever a given
- - condition (a `Stream Bool`) is true, and passed a set of values (sampled
- - from the specified `Stream`s).
- -
- - A program specification is a set of triggers, their condition signals, and
- - the arguments which they receive. This can be simulated in Haskell by giving
- - mock values for the "extern" signals. It can also be compiled to C with C
- - extern declarations for all "extern" signals as well as all declared
- - triggers.
- -
- - The specification for this program is called `spec`.
- -}
+This is a [copilot](https://copilot-language.github.io/) program designed
+to control a mechanical ventilatilation system.
+
+The program works with data streams (type `Stream Int32` for instance),
+some of which are "extern" (set by a C program), and it defines "triggers",
+which correspond to C functions which will be called whenever a given
+condition (a `Stream Bool`) is true, and passed a set of values (sampled
+from the specified `Stream`s).
+
+A program specification is a set of triggers, their condition signals, and
+the arguments which they receive. This can be simulated in Haskell by giving
+mock values for the "extern" signals. It can also be compiled to C with C
+extern declarations for all "extern" signals as well as all declared
+triggers.
+
+The specification for this program is called `spec`.
+-}
 
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE DataKinds #-}
@@ -237,6 +237,6 @@ spec = do
   -- TODO should have an alarm code.
   trigger "raise_alarm" alarm []
 
--- | Write out the spec to C in "ventilator.h" and "ventilator.c"
+-- | Write out the spec to C in @ventilator.h@ and @ventilator.c@
 gen_c :: IO ()
 gen_c = reify spec >>= compile "ventilator"

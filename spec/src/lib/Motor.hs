@@ -1,5 +1,9 @@
 {-# LANGUAGE RebindableSyntax #-}
 
+{-|
+Definitions related to the motor, its hardware driver, and rotary encoder.
+-}
+
 module Motor where
 
 import Language.Copilot

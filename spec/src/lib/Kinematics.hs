@@ -1,6 +1,27 @@
 {-# LANGUAGE RebindableSyntax #-}
 
-module Kinematics where
+{-|
+Definitions related to the physical properties of the assembly which this
+software controls.
+-}
+
+module Kinematics
+  ( forward_kinematics_mm
+  , reverse_kinematics
+  , l
+  , big_l
+  , bellows_length_mm
+  , bellows_diameter_mm
+  , bellows_xsection_area_mm_2
+  , start_position_mm
+  , theta_max
+  , theta_min
+  , theta
+  , inverse_volume_delivered
+  , volume_f
+  , flow_f
+  , flow_f_observed
+  ) where
 
 import Language.Copilot
 
@@ -116,16 +137,17 @@ inverse_volume_delivered mm3 = reverse_kinematics (x_mm + constant start_positio
 -- | Given how far the piston lies to the right of the motor shaft, determine
 -- the angle in standard right-hand-rule (see `forward_kinematics_mm` which
 -- should invert this).
--- TODO property tests for inversion (with suitable FP error theshold).
 --
+-- @
 --
---   \  ----
---  |  \     ----   L
--- h|  l \         ----
---  |      \  theta      ----
---  |________\_________________----
---     x_a          x_b
+--   \\  ----
+--  |  \\     ----   L
+-- h|  l \\         ----
+--  |      \\  theta      ----      |
+--  |_ _ _ _ \\ _ _ _ _ _ _ _ _ ----|
+--     x_a          x_b             |
 --               x
+-- @
 --
 -- We're interested in the angle to the left of theta, call it phi. We'll
 -- compute that and subtract it from pi to get the radians, then convert to
@@ -137,13 +159,15 @@ inverse_volume_delivered mm3 = reverse_kinematics (x_mm + constant start_positio
 --
 -- We have
 --
---   1. phi = acos(x_a/l)
---   2. (x_a + x_b)^2 + h^2 = L^2
---   3. h^2 = l^2 - x_a^2
+--   1. @phi = acos(x_a/l)@
+--   2. @(x_a + x_b)^2 + h^2 = L^2@
+--   3. @h^2 = l^2 - x_a^2@
 --
 -- From 2 and 3 we get
 --
+-- @
 --   x_a = (L^2 - l^2 - x_b^2) / 2*x_b
+-- @
 --
 -- then we take the arccos and convert to degrees.
 --
@@ -203,14 +227,16 @@ radians_to_degrees r = 180.0 * (r / pi)
 -- The angle is in standard right-hand-rule style: 0 would mean the motor has
 -- pushed the piston all the way forward.
 --
+-- @
 --          / ---
 --        /  |    ---  L          ___________
 --   l  /    |y        ---       |
 --    /      |            ---    |
---  /________|_______________ ---|  bellows
+--  /_ _ _ _ | _ _ _ _ _ _ _ _---|  bellows
 --     x_a         x_b           |
 --                               |___________
--- 
+-- @
+--
 -- The input angle theta is the one on the left bottom.
 forward_kinematics_mm :: Stream Double -> Stream Double
 forward_kinematics_mm theta = x_a + x_b
