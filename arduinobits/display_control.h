@@ -232,8 +232,12 @@ void display_block(char blockArray[], int row, int column, int cursorBlink, int 
 
 void format_display_block(char blockArray[], int blockIndex, int cursorState){
   int shiftCount = 0;
-  
-  for(int i  = 1; i < LCD_BLOCK_SIZE; i++){
+
+  /**
+   * The display functions will put leading zeros, but we don't want to
+   * display them.
+   */
+  /*for(int i  = 1; i < LCD_BLOCK_SIZE; i++){
     if(blockArray[i] == 48){ //check how many previous zeros there are
       shiftCount++;
     }
@@ -263,7 +267,7 @@ void format_display_block(char blockArray[], int blockIndex, int cursorState){
 
   if(shiftCount >= LCD_BLOCK_SIZE-1){
       blockArray[LCD_BLOCK_SIZE-1] = 48;
-  }
+  }*/
   
   if(cursorState){
     blockArray[0] = 62;
@@ -293,10 +297,20 @@ void int_to_display(int value, char blockArray[], int blockIndex, int cursorStat
     blockArray[LCD_BLOCK_SIZE-1] = 9 + 48;
     blockArray[LCD_BLOCK_SIZE-2] = 9 + 48;
     blockArray[LCD_BLOCK_SIZE-3] = 9 + 48;
+  } else if (number == 0) {
+    blockArray[LCD_BLOCK_SIZE-1] = 48;
+    blockArray[LCD_BLOCK_SIZE-2] = 32;
+    blockArray[LCD_BLOCK_SIZE-3] = 32;
   } else {
     for(int i = 0; i < (LCD_BLOCK_SIZE-1); i++){
       blockArray[LCD_BLOCK_SIZE-1-i] = (number % 10) + 48; //offset by ascii zero for actual number
       number = number / 10;
+    }
+    if (value < 100) {
+      blockArray[LCD_BLOCK_SIZE-3] = 32;      
+    }
+    if (value < 10) {
+      blockArray[LCD_BLOCK_SIZE-2] = 32;
     }
   }  
   format_display_block(blockArray, blockIndex, cursorState);

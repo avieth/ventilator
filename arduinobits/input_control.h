@@ -68,7 +68,7 @@ int value_change_manager(int currentEncoderValue, int pastEncoderValue, int rese
 uint8_t breathRate_manager(uint8_t currentValue, int increment);
 uint32_t tidalVolume_manager(uint32_t currentValue, int increment);
 uint32_t pPeak_manager(uint32_t currentValue, int increment);
-uint8_t ieRatio_manager(uint8_t currentValue, int increment);
+void ieRatio_manager(uint8_t *currentInhale, uint8_t *currentExhale, int increment);
 
 //float peep_manager(float currentValue, int increment);
 //int oxygenPercent_manager(int currentValue, int increment);
@@ -182,7 +182,7 @@ int value_change_manager(int currentEncoderValue, int pastEncoderValue, int rese
         measurements->valueSet = 1;
         break;
       }
-      measurements->ieExhale = ieRatio_manager(measurements->ieExhale, increment);
+      ieRatio_manager(&(measurements->ieInhale), &(measurements->ieExhale), increment);
     break;
 
     default:
@@ -252,12 +252,52 @@ uint32_t pPeak_manager(uint32_t currentValue, int increment){
 
 /**
  * Increments/decrements the exhale portion only.
+ * 
+ * How can we control a ratio succinctly in one variable?
+ * Imagine 1:1 is the lowest. What lies in between?
+ * 
+ *  1:1
+ *  2:3
+ *  1:2
+ *  1:3
+ *  1:4
+ * 
+ * Can we do this in such a way that we change only the denominator?
+ * Surely not....
  */
-uint8_t ieRatio_manager(uint8_t currentValue, int increment){
-  if(increment > 0){
-    return currentValue + 1;
-  } else{
-    return currentValue - 1;
+void ieRatio_manager(uint8_t *currentInhale, uint8_t *currentExhale, int increment){
+  // Increase the ratio (make it bigger as a fraction).  Maximum is 1:1.
+  if (increment > 0){
+    if (*currentInhale == 1 && *currentExhale == 4) {
+      *currentInhale = 1;
+      *currentExhale = 3;
+    } else if (*currentInhale == 1 && *currentExhale == 3) {
+      *currentInhale = 1;
+      *currentExhale = 2;
+    } else if (*currentInhale == 1 && *currentExhale == 2) {
+      *currentInhale = 2;
+      *currentExhale = 3;
+    } else {
+      *currentInhale = 1;
+      *currentExhale = 1;
+    }
+  } else {
+    if (*currentInhale == 1 && *currentExhale == 1) {
+      *currentInhale = 2;
+      *currentExhale = 3;
+    } else if (*currentInhale == 2 && *currentExhale == 3) {
+      *currentInhale = 1;
+      *currentExhale = 2;
+    } else if (*currentInhale == 1 && *currentExhale == 2) {
+      *currentInhale = 1;
+      *currentExhale = 3;
+    } else if (*currentInhale == 1 && *currentExhale == 3) {
+      *currentInhale = 1;
+      *currentExhale = 4;
+    } else {
+      *currentInhale = 1;
+      *currentExhale = 4;
+    }
   }
 }
 
