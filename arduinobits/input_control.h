@@ -84,7 +84,7 @@ void input_control(long currenTime);
  */
 input_state *inputs_setup(display_state *displayState, uint8_t *in_bpm_ptr, uint32_t *in_volume_ptr, uint32_t *in_pressure_ptr, uint8_t *in_ie_inhale_ptr, uint8_t *in_ie_exhale_ptr){
   pinMode(START_LED, OUTPUT);
-  digitalWrite(START_LED, LOW);
+  digitalWrite(START_LED, HIGH);
   inputState.input_controls.enc = new Encoder(KNOB_ENC_A, KNOB_ENC_B);
   inputState.input_controls.enc->write(0);
   inputState.input_display_state = displayState;
@@ -353,8 +353,7 @@ void read_inputs(long currentTime, int timerReset){
       // TODO factor this out into its own routine for clarity: commits the changes.
       *(inputState.bpm) = inputState.input_display_state->breathRate;
       *(inputState.volume) = inputState.input_display_state->tidalVolume;
-      // Input is in cm water, device uses Pa.
-      *(inputState.pressure) = 98 * inputState.input_display_state->pPeak;
+      *(inputState.pressure) = inputState.input_display_state->pPeak;
       *(inputState.ie_inhale) = inputState.input_display_state->ieInhale;
       *(inputState.ie_exhale) = inputState.input_display_state->ieExhale;
 
