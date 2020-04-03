@@ -51,7 +51,8 @@ pulsedata = pulse_data_from_velocity_dps motor_velocity
 -- This is the essence of the ventilator program.
 --
 motor_velocity :: Stream Int32
-motor_velocity = velocity
+peak_pressure :: Stream Int32
+(motor_velocity, peak_pressure) = (velocity, peak_pressure)
 
   where
 
@@ -74,6 +75,15 @@ motor_velocity = velocity
   -- again.
   cmv_control :: CMVControl
   cmv_control = calibrated
+
+  peak_pressure :: Stream Int32
+  peak_pressure = [0] ++
+    if subcycle_change
+    then 0
+    else Util.max peak_pressure insp_pressure_accumulator
+    where
+    subcycle = [False] ++ cmv_subcycle (cmv_cycle cmv_control spontaneous_breath)
+    subcycle_change = subcycle /= cmv_subcycle (cmv_cycle cmv_control spontaneous_breath)
 
   spontaneous_breath :: SpontaneousBreath
   spontaneous_breath = Sensors.inhale
@@ -218,7 +228,7 @@ spec = do
     -- TODO use sensors.
       arg_named "flow"      $ (unsafeCast (unsafeCast (flow_f_observed time_delta_us Kinematics.volume_f) :: Stream Int64) :: Stream Int32)
     , arg_named "volume_ml" $ (unsafeCast (unsafeCast (volume_f / 1000.0) :: Stream Int64) :: Stream Int32)
-    , arg_named "pressure" $ insp_pressure_accumulator
+    , arg_named "pressure" $ peak_pressure
 
     , arg_named "bpm_limited"    $ bpm_limited
     , arg_named "ie_inhale"      $ ie_inhale_limited

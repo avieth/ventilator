@@ -5,6 +5,8 @@ module CMV
   ( CMVControl
   , SpontaneousBreath
   , VMode (..)
+  , CMVCycle (..)
+  , cmv_cycle
   , cmv
   ) where
 

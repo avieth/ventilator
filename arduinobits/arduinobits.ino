@@ -1,4 +1,5 @@
 #include <Encoder.h>
+#include <math.h>
 #include "pins.h"
 #include "sensor_control.h"
 #include "display_control.h"
@@ -157,15 +158,16 @@ void update_sensors() {
 
   /** 
    *  Sample the sensors and round them to integers.
-   *  We give 1000 times the values before rounding.
    *  
    *  No redundant sensors so we just copy the values.
    */
-  s_insp_pressure_1 = lroundf(get_insp_pressure());
+
+  /**
+   *  Pressure is a float in kPa but we want a whole number Pa so we multiply by 1000.
+   */
+  //s_insp_pressure_1 = lroundf(get_insp_pressure() * 1000.0);
+  s_insp_pressure_1 = get_insp_pressure_i();
   s_insp_pressure_2 = s_insp_pressure_2;
-  if (s_insp_pressure_1 > 0) {
-    Serial.println(s_insp_pressure_1);
-  }
   s_insp_flow_1 = lroundf(get_insp_flow());
   s_insp_flow_2 = s_insp_flow_1;
   s_exp_flow_1 = lroundf(get_exp_flow());
@@ -219,6 +221,9 @@ void debug() {
   debug_elapsed_us += t_delta_us;
   if (debug_elapsed_us >= DEBUG_INTERVAL) {
     // Put periodic debug code here if you desire.
+    //Serial.println("DEBUG");
+    //Serial.print(" insp pressure in Pa: ");
+    //Serial.println(s_insp_pressure_1);
     debug_elapsed_us = 0;
   }
 }
@@ -235,7 +240,14 @@ void debug() {
  * nonsense) then it will not be displayed.
  */
 void update_ui(long in_flow, long in_volume, long in_pressure, unsigned char in_bpm, unsigned char in_inhale_ratio, unsigned char in_exhale_ratio, bool in_cmv_mode, unsigned long in_cmv_volume_goal, unsigned long in_cmv_pressure_goal) {
-  lcd_control(in_bpm, in_volume, in_pressure, in_inhale_ratio, in_exhale_ratio);
+  /*Serial.print(in_pressure);
+  Serial.print(" : ");
+  Serial.print(get_insp_pressure_i());
+  Serial.print(" : ");
+  Serial.print(s_insp_flow_1);
+  Serial.print(" : ");
+  Serial.println(s_exp_flow_1);*/
+  lcd_control(in_bpm, in_volume, ((int32_t) max(0, in_pressure)), in_inhale_ratio, in_exhale_ratio);
 }
 
 /**

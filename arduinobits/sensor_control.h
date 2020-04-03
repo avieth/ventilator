@@ -19,7 +19,7 @@
 #define EXPFLOW 2
 #define AIRINFLOW 3
 
-uint16_t sensor_offsets[SENSOR_COUNT] = { 0, 0, 0, 0 };
+int16_t sensor_offsets[SENSOR_COUNT] = { 0, 0, 0, 0 };
 uint8_t sensor_pins[SENSOR_COUNT] = { 
     PIN_INSP_PRESSURE,
     PIN_INSP_FLOW,
@@ -30,12 +30,13 @@ uint8_t sensor_pins[SENSOR_COUNT] = {
 /**
  * Only call with one of the defined sensor names above.
  * You get 0 otherwise.
+ * Can be negative, in case the pin reads less than the offset.
  */
 int16_t read_sensor_with_offset(uint8_t sensor_id) {
-  if (sensor_id >= SENSOR_COUNT) {
-    return 0;
+  if (sensor_id < SENSOR_COUNT) {
+    return read_sensor(sensor_pins[sensor_id]) - sensor_offsets[sensor_id];
   } else {
-    return ((int16_t) read_sensor(sensor_pins[sensor_id])) - ((int16_t) sensor_offsets[sensor_id]);
+    return 0;
   }
 }
 
@@ -58,12 +59,26 @@ bool initializeSensors(){
 //SENSORS
 
 /**
- * Inspiration pressure at this instant.
+ * Inspiration pressure at this instant, kPa (most information is in the fractional part).
  * TODO make it integral.
+ * TODO delete, we have an integral version.
  */
 float get_insp_pressure() {
   int32_t rawData = read_sensor_with_offset(INSPPRESSURE);
   return pressure_difference(rawData);
+}
+
+int32_t get_insp_pressure_i() {
+  int32_t a = pressure_difference_i(read_sensor_with_offset(INSPPRESSURE));
+  int32_t b = pressure_difference_i(read_sensor_with_offset(INSPPRESSURE));
+  int32_t c = pressure_difference_i(read_sensor_with_offset(INSPPRESSURE));
+  int32_t d = pressure_difference_i(read_sensor_with_offset(INSPPRESSURE));
+  int32_t avg = (a + b + c + d) / 4;
+  if (abs(avg) <= 10) {
+    return 0;
+  } else {
+    return avg;
+  }
 }
 
 /**
@@ -72,7 +87,12 @@ float get_insp_pressure() {
  */
 float get_insp_flow() {
   int32_t rawData = read_sensor_with_offset(INSPFLOW);
-  return flow_rate(rawData); 
+  return flow_rate(rawData);
+}
+
+int32_t get_insp_flow_i() {
+  int32_t rawData = read_sensor_with_offset(INSPFLOW);
+  return flow_rate_i(rawData);
 }
 
 /**

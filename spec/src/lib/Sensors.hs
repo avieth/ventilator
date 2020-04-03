@@ -17,10 +17,11 @@ module Sensors
   , OxygenSensors (..)
   ) where
 
-import Language.Copilot
+import Language.Copilot hiding (max)
 import Redundancy
+import Util (max, integral)
 
-import Prelude hiding ((++), (&&), (>=), div, drop)
+import Prelude hiding ((++), (&&), (>=), div, drop, max)
 
 -- | Organizational record for sensors relating to the piston and motor.
 data MotorSensors = MotorSensors
@@ -142,9 +143,47 @@ inhale_accumulator = accumulator . principal . s_insp_flow . s_flow $ sensors
 exhale_accumulator :: Stream Int32
 exhale_accumulator = accumulator . principal . s_exp_flow . s_flow $ sensors
 
--- | Accumulated (averaged) inspiration pressure sensor.
+-- | How to filter the insp pressure sensor?
+-- Let's try smoothing it by taking the average of the next and the last
+-- signal.
 insp_pressure_accumulator :: Stream Int32
-insp_pressure_accumulator = accumulator . principal . s_insp_pressure . s_pressure $ sensors
+insp_pressure_accumulator = accumulator sensor_data
+  where
+  --stream = [0] ++ if low_switch then 0 else stream + sensor_data
+  {-stream = integral 0 sensor_data-}
+  sensor_data = principal . s_insp_pressure . s_pressure $ sensors
+{-
+insp_pressure_accumulator = stream
+
+  where
+
+  stream = [0] ++ next
+
+  next = (stream `div` 2) + (sensor_data `div` 2)
+
+  sensor_data = principal . s_insp_pressure . s_pressure $ sensors
+-}
+
+{-
+insp_pressure_accumulator = maxi
+  where
+  sensor_data = principal . s_insp_pressure . s_pressure $ sensors
+
+  -- TODO bug: if we use 16 elements here, the c source blows up to 4M!!!
+  -- With 12, it's 364K. With 14 it's 1104K. With 10, it's 180K.
+  -- Yes indeed, each additional member doubles the source size!
+  -- MUST look into that...
+  stream = [0,0,0,0,0,0,0,0] ++ sensor_data
+  maxi :: Stream Int32
+  maxi = max stream
+       $ max (drop 1 stream)
+       $ max (drop 2 stream)
+       $ max (drop 3 stream)
+       $ max (drop 4 stream)
+       $ max (drop 5 stream)
+       $ max (drop 6 stream)
+       $     (drop 7 stream)
+-}
 
 -- | True when an inhale has been detected: whenever `inhale_accumulator`
 -- is greater or equal to 8.
