@@ -290,6 +290,7 @@ void ratio_to_display(unsigned char numerator, unsigned char denominator, char b
 
 /**
  * Shows 999 if the value is greater than 999.
+ * Shows 0 if it's less than 0.
  */
 void int_to_display(int value, char blockArray[], int blockIndex, int cursorState){
   int number = value;
@@ -297,7 +298,8 @@ void int_to_display(int value, char blockArray[], int blockIndex, int cursorStat
     blockArray[LCD_BLOCK_SIZE-1] = 9 + 48;
     blockArray[LCD_BLOCK_SIZE-2] = 9 + 48;
     blockArray[LCD_BLOCK_SIZE-3] = 9 + 48;
-  } else if (number == 0) {
+  } else if (number <= 0) {
+    // No support for negatives at the moment.
     blockArray[LCD_BLOCK_SIZE-1] = 48;
     blockArray[LCD_BLOCK_SIZE-2] = 32;
     blockArray[LCD_BLOCK_SIZE-3] = 32;
