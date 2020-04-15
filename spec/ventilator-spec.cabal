@@ -17,16 +17,19 @@ build-type:          Simple
 extra-source-files:  CHANGELOG.md
 
 library
-  exposed-modules:     CMV
-                       Controls
+  exposed-modules:     Controls
                        Cycle
-                       Kinematics
+                       Mode.Mandatory
+                       Mode.Spontaneous
                        Motor
+                       Kinematics
                        Redundancy
                        Sensors
+                       State
                        Time
                        Util
                        Ventilator
+
   build-depends:       base >= 4.12 && <4.14,
                        copilot,
                        copilot-c99

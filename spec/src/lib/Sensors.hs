@@ -6,6 +6,9 @@ module Sensors
   , MotorSensors (..)
   , low_switch
   , high_switch
+  , encoder_position
+  , encoder_position_low
+  , encoder_position_high
   , FlowSensors (..)
   , inhale_accumulator
   , exhale_accumulator
@@ -126,6 +129,7 @@ sensors = Sensors
   , s_flow     = flow_sensors
   }
 
+{-
 -- | Take the average of a stream over 8 samples.
 accumulator :: Stream Int32 -> Stream Int32
 accumulator x = sum `div` constant 8
@@ -134,14 +138,22 @@ accumulator x = sum `div` constant 8
   sum :: Stream Int32
   sum =        stream + drop 1 stream + drop 2 stream + drop 3 stream
       + drop 4 stream + drop 5 stream + drop 6 stream + drop 7 stream
+-}
+accumulator :: Stream Int32 -> Stream Int32
+accumulator x = sum `div` constant 4
+  where
+  stream = [0,0,0,0] ++ x
+  sum = stream + drop 1 stream + drop 2 stream + drop 3 stream
 
 -- | Accumulated (averaged) inhale flow sensors.
 inhale_accumulator :: Stream Int32
-inhale_accumulator = accumulator . principal . s_insp_flow . s_flow $ sensors
+--inhale_accumulator = accumulator . principal . s_insp_flow . s_flow $ sensors
+inhale_accumulator = principal . s_insp_flow . s_flow $ sensors
 
 -- | Accumulated (averaged) exhale flow sensors.
 exhale_accumulator :: Stream Int32
-exhale_accumulator = accumulator . principal . s_exp_flow . s_flow $ sensors
+--exhale_accumulator = accumulator . principal . s_exp_flow . s_flow $ sensors
+exhale_accumulator = principal . s_exp_flow . s_flow $ sensors
 
 -- | How to filter the insp pressure sensor?
 -- Let's try smoothing it by taking the average of the next and the last
@@ -217,3 +229,35 @@ high_switch = sensor && drop 1 sensor
   where
   sensor :: Stream Bool
   sensor = [False, False] ++ s_limit_high (s_motor sensors)
+
+-- | The encoder position at the low switch. Updated whenever the low switch
+-- is hit.
+--
+-- An initial calibration routine will be sure to hit the low switch and
+-- the high switch so as to set these streams to proper values.
+encoder_position_low :: Stream Int32
+encoder_position_low = stream
+  where
+  stream = [0] ++
+    if low_switch
+    then s_encoder_position (s_motor sensors)
+    else stream
+
+-- TODO sanity check on high and low positions: given the number of encoder
+-- pulses per revolution, we know what the difference between low and high
+-- should be.
+
+encoder_position_high :: Stream Int32
+encoder_position_high = stream
+  where
+  stream = [0] ++
+    if high_switch
+    then s_encoder_position (s_motor sensors)
+    else stream
+
+-- | Absolute encoder position.
+-- This is meaningless without reference. Use 'encoder_position_low'
+-- and 'encoder_position_high', which are set when the low and high switches
+-- are triggered.
+encoder_position :: Stream Int32
+encoder_position = s_encoder_position (s_motor sensors)

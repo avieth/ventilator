@@ -28,9 +28,10 @@
 
 
 int16_t sensor_offset(uint8_t analogPin);
-int16_t read_sensor(uint8_t pin);
+uint16_t read_sensor(uint8_t pin);
 float pressure_difference(int16_t measurement);
-float flow_rate(int32_t measurement);
+float flow_rate(int16_t measurement);
+int32_t flow_rate_i(int16_t measurement);
 
 /**
  * Reads a pin 10 times, takes the integral average plus 1, to give a baseline reading.
@@ -41,20 +42,20 @@ int16_t sensor_offset(uint8_t analogPin){
   int32_t sum = 0;
   
   for(int i = 0; i < 10; i++){ //blocking for initialization 
-    sum = sum + analogRead(analogPin);
+    sum = sum + (int32_t) (analogRead(analogPin));
   }
   
   sum = sum / 10;
   sum = sum + 1;
   
-  return (int16_t) sum;
+  return sum;
 }
 
 /**
  * Read the sensor on a given pin. Just a simple analogRead. No adjustment is done.
  * Resolution is hardware dependent. 10 bits on the arduino uno.
  */
-int16_t read_sensor(uint8_t pin){
+uint16_t read_sensor(uint8_t pin){
   return analogRead(pin); 
 }
 
@@ -66,7 +67,7 @@ int16_t read_sensor(uint8_t pin){
  * Instead of multiplying by 4.88 and dividing by 450, for example, we can put the measurement into a
  * 32-bit unsigned integer and multiply by 1000. The returned value would be 1000 times the pressure difference.
  */
-float pressure_difference(int16_t measurement){
+float pressure_difference(uint16_t measurement){
   float pressureDiff = (((float) measurement) * 4.88) / 450.0;
   // Unit is kPa.
   return pressureDiff;
@@ -74,11 +75,11 @@ float pressure_difference(int16_t measurement){
 }
 
 /**
- * Unit is Pa.
+ * TBD unit? Pa?
  */
 int32_t pressure_difference_i(int16_t measurement) {
-  int32_t pressureDiff = (((int32_t) measurement) * 4880) / 450;
-  return pressureDiff;
+  int32_t wide_measurement = (int32_t) measurement;
+  return (wide_measurement * 4880) / ((int32_t) 450);
 }
 
 
@@ -90,25 +91,34 @@ int32_t pressure_difference_i(int16_t measurement) {
  * FIXME is this even correct? I thought the venturi nozzle flow computation required two pressure
  * values. Here, pressure_difference seems to use only one pressure value.
  */
-float flow_rate(int32_t measurement) {
-  float pressure = pressure_difference(measurement);
-  if (pressure <= 0) {
-    return 0;
-  }
-  float numerator = 2.0 * pressure * 1000.0 / AIR_DENSITY;
-  // FIXME it can be negative, in which case you get NaN from the sqrt.
-  float flow = AREA1 * sqrt(numerator/DENOMINATOR());
-  flow = flow * 1000 * 60; // L/minute
-  return flow;
-}
-
-int32_t flow_rate_i(int32_t measurement) {
+float flow_rate(int16_t measurement) {
   int32_t pressure = pressure_difference_i(measurement);
-  if (pressure <= 0) {
-    return 0;
+  float numerator = 2.0 * ((float) pressure) / AIR_DENSITY;
+  // FIXME it can be negative, in which case you get NaN from the sqrt.
+  if (numerator < 0) {
+    return -60000 * AREA1 * sqrt(-numerator/DENOMINATOR());
+  } else {
+    return 60000 * AREA1 * sqrt(numerator/DENOMINATOR());
   }
-  int32_t numerator = (2000 * pressure) / AIR_DENSITY_G_M_3;
-  int32_t flow = AREA1_MM_2 * sqrt(numerator / DENOMINATOR_I);
-  return flow;
+}
+/*
+int32_t sqrt_i(int32_t n) {
+  int32_t x = n;
+  int32_t y = 1;
+  while (x > y) {
+    x = (x + y) / 2;
+    y = n / x;
+  }
+  return x;
 }
 
+int32_t flow_rate_i(int16_t measurement) {
+  int32_t pressure_d = pressure_difference_i(measurement);
+  int32_t numerator = (2000 * pressure_d) / AIR_DENSITY_G_M_3;
+  if (pressure_d < 0) {
+    return -AREA1_MM_2 * sqrt_i((-numerator) / DENOMINATOR_I);
+  } else {
+    return AREA1_MM_2 * sqrt_i(numerator / DENOMINATOR_I);
+  }
+}
+*/

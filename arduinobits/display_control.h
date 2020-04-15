@@ -14,6 +14,8 @@
 #define LCD_D6                18
 #define LCD_D7                19
 
+#define LED A6
+
 LiquidCrystal display(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 
 /**
@@ -47,8 +49,10 @@ typedef struct display_state {
   int cursorIndex;
   int cursorActive;
   int valueSet;
-  int startStopState;
-  int startStopStateFlag;
+  int modeState;
+  int modeStateFlag;
+
+  uint8_t state;
 
   // These hold the values that are being edited.
   uint8_t breathRate;
@@ -99,8 +103,10 @@ display_state *setup_display(uint8_t in_bpm, uint32_t in_volume, uint32_t in_pre
   displayState.cursorIndex = 0;
   displayState.cursorActive = 0;
   displayState.valueSet = 1;
-  displayState.startStopState = 0;
-  displayState.startStopStateFlag = 0;
+  displayState.modeState = 0;
+  displayState.modeStateFlag = 0;
+
+  displayState.state = 0;
   
   displayState.breathRate = in_bpm;
   displayState.tidalVolume = in_volume;
@@ -146,7 +152,7 @@ void load_display(displayBlock lcd[], uint8_t in_bpm, uint32_t in_volume, uint32
   uint32_t pressure_to_display = (lcd[index].valueSet == 1) ? in_pressure : displayState.pPeak;
   // TODO It's in Pa; convert to cm water, approximately.
   // Currently no support for showing negatives.
-  pressure_to_display = (30 * pressure_to_display) / 98;
+  pressure_to_display = pressure_to_display / 98;
   int_to_display(pressure_to_display, lcd[index].blockArray, index, cursorState);
   index++;
   
@@ -176,30 +182,6 @@ void load_display(displayBlock lcd[], uint8_t in_bpm, uint32_t in_volume, uint32
   lcd[index].valueSet = (displayState.valueSet == 0 && cursorState) ? 0 : 1;
   float_to_display(displayState.peep, lcd[index].blockArray, index, cursorState);
 }
-
-/**
- * Render all of these blocks to the display.
- */
-void display_values(displayBlock lcd[]){
-  static int cursorBlink = 0;
-  int row;
-  int column;
-  
-  for(int i = 0; i < LCD_BLOCKS(); i++){
-    if(i < 4){
-      row = 0;
-      column = i * 4;
-    }
-    else{
-      row = 1;
-      column = (i * 4) - 16; 
-    }
-    display_block(lcd[i].blockArray, row, column, cursorBlink, lcd[i].valueSet);
-  }
-  
-  cursorBlink = !cursorBlink;
-}
-
 
 void display_block(char blockArray[], int row, int column, int cursorBlink, int valueSet){
   display.setCursor(column, row);
@@ -232,44 +214,6 @@ void display_block(char blockArray[], int row, int column, int cursorBlink, int 
 
 
 void format_display_block(char blockArray[], int blockIndex, int cursorState){
-  int shiftCount = 0;
-
-  /**
-   * The display functions will put leading zeros, but we don't want to
-   * display them.
-   */
-  /*for(int i  = 1; i < LCD_BLOCK_SIZE; i++){
-    if(blockArray[i] == 48){ //check how many previous zeros there are
-      shiftCount++;
-    }
-    else{
-      break;
-    }
-  }
-  
-  
-  for(int i = 0; i < shiftCount; i++){
-    if(blockIndex % 2 == 0){
-      for(int j = 0; j < LCD_BLOCK_SIZE-1; j++){
-        blockArray[j] = blockArray[j+1];
-      }
-    }
-  }
-  
-  
-  for(int i = 0; i < shiftCount; i++){
-    if(blockIndex % 2 == 0){
-      blockArray[LCD_BLOCK_SIZE-1-i] = 32;
-    }
-    else{
-      blockArray[i+1] = 32;
-    }
-  }
-
-  if(shiftCount >= LCD_BLOCK_SIZE-1){
-      blockArray[LCD_BLOCK_SIZE-1] = 48;
-  }*/
-  
   if(cursorState){
     blockArray[0] = 62;
   }
@@ -363,13 +307,52 @@ void display_stop(){
 }
 
 /**
- * Update the UI with these values.
- * Do not call too often, it's expensive.
+ * Run this often. It will blink the light according to the current state.
+ * 
+ * - Slow flashing in ready or stopped
+ * - Fast flashing in calibration
+ * - Solid in normal operation
+ * - 
+ * 
+ * TODO when we have more user feedback hardware, also do alarm signals.
  */
-void lcd_control(uint8_t in_bpm, uint32_t in_volume, uint32_t in_pressure, uint8_t in_ie_inhale, uint8_t in_ie_exhale){
-  if(displayState.startStopStateFlag){
+void led_display(void) {
+  uint8_t in_state = displayState.state;
+  static uint8_t current = 0;
+  // 2 is running
+  if (in_state == 2 && current != 2) {
+    digitalWrite(LED, HIGH);
+  } else if (in_state == 0) {
+    // Calibrating: blink fast.
+    uint32_t ms = millis();
+    if ((ms % 500) <= 250) {
+      digitalWrite(LED, HIGH);
+    } else {
+      digitalWrite(LED, LOW);
+    }
+  } else if (in_state == 1) {
+    // Ready: blink slowly.
+    uint32_t ms = millis();
+    if ((ms % 4000) <= 2000) {
+      digitalWrite(LED, HIGH);
+    } else {
+      digitalWrite(LED, LOW);
+    }
+  } else if (in_state == 3 && current != 3) {
+    // Stopped: show nothing
+    digitalWrite(LED, LOW);
+  }
+  current = in_state;
+}
+
+/**
+ * Set the values to display, but do not carry out the actual LCD update, as that is very expensive (see lcd_display).
+ */
+void lcd_control(uint8_t in_state, uint8_t in_mode, uint8_t in_bpm, uint32_t in_volume, uint32_t in_pressure, uint8_t in_ie_inhale, uint8_t in_ie_exhale){
+  displayState.state = in_state;
+  if(displayState.modeStateFlag){
     display.clear();
-    if(displayState.startStopState){
+    if(displayState.modeState){
       display_start();  
     }
     else{
@@ -377,6 +360,49 @@ void lcd_control(uint8_t in_bpm, uint32_t in_volume, uint32_t in_pressure, uint8
     }
   } else {
     load_display(lcdDisplay, in_bpm, in_volume, in_pressure, in_ie_inhale, in_ie_exhale);
-    display_values(lcdDisplay);
+  }
+}
+
+// One pass every 20ms
+#define LCD_DRAW_RATE 20000
+// Blink once every half second
+#define CURSOR_BLINK_RATE 500000
+
+/**
+ * Call this at every step. It will update at most one LCD block, so as to not take too much time from any
+ * process cycle. Updating the whole display takes around 20ms which is unaccetptably slow, as it interferes
+ * with the ventilator system logic and the motor step control loop.
+ * 
+ * FIXME there are a bunch of delay calls in the LiquidCrystal library. Why? Can't we make it non-blocking?
+ */
+void lcd_display(void) {
+  static uint8_t block_index = 0;
+  static uint8_t row = 0;
+  static uint8_t col = 0;
+  static uint8_t cursor_blink = 0;
+  static uint32_t accumulator_us = 0;
+  static uint32_t blink_accumulator_us = 0;
+  static uint32_t last_draw = 0;
+  uint32_t now = micros();
+  uint32_t delta_us = now - last_draw;
+  accumulator_us = accumulator_us + delta_us;
+  blink_accumulator_us = blink_accumulator_us + delta_us;
+  bool should_draw = accumulator_us >= LCD_DRAW_RATE;
+  if (should_draw) {
+    accumulator_us = (accumulator_us - LCD_DRAW_RATE) % LCD_DRAW_RATE;
+    last_draw = now;
+    if (block_index < 4) {
+      row = 0;
+      col = block_index * 4;
+    } else {
+      row = 1;
+      col = (block_index * 4) - 16;
+    }
+    display_block(lcdDisplay[block_index].blockArray, row, col, cursor_blink, lcdDisplay[block_index].valueSet);
+    block_index = (block_index + 1) % LCD_BLOCKS();
+  }
+  if (blink_accumulator_us >= CURSOR_BLINK_RATE) {
+    cursor_blink = !cursor_blink;
+    blink_accumulator_us = (blink_accumulator_us - CURSOR_BLINK_RATE) % CURSOR_BLINK_RATE;
   }
 }

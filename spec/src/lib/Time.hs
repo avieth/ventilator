@@ -32,6 +32,8 @@ time = Time
   }
 
 -- | Change in time in microseconds since the last frame.
+--
+-- Starts at 0 since there should be no time delta on the first frame
 time_delta_us :: Stream Word32
 time_delta_us = [0] ++ c_time_delta_us time
 

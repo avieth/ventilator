@@ -5,6 +5,13 @@ module Controls
   ( Controls
   , controls
 
+  , Mode
+  , mode
+  , mCMV
+  , mSIMV
+  , button_start_high_edge
+  , button_stop_high_edge
+
   , error_controls
 
   , bpm_limited
@@ -16,6 +23,8 @@ module Controls
   , peep_limited
 
   , cmv_mode
+  , cmvVC
+  , cmvPC
   , cmv_volume_goal_limited
   , cmv_pressure_goal_limited
 
@@ -27,15 +36,34 @@ module Controls
   , global_pressure_max
   ) where
 
-import Prelude hiding ((==), (>), (>=), (<=), div, mod)
+import Prelude hiding ((++), (&&), (==), (>), (>=), (<=), div, drop, mod, not)
 import Language.Copilot
-
 import qualified Util as Util (clamp)
+
+-- | "Macro" ventilation mode (CMV, SIMV, etc.)
+type Mode = Word8
+
+mCMV :: Stream Mode
+mCMV = constant 0
+
+mSIMV :: Stream Mode
+mSIMV = constant 1
+
+mode :: Stream Mode
+mode = c_mode controls
 
 -- | Organizational record for all operator control signals (user input).
 data Controls = Controls
-  { -- | Breaths per minute.
-    c_bpm                :: Stream Word8
+  { -- | Mode of operation (CMV, SIMV, etc.)
+    c_mode      :: Stream Mode
+
+    -- | Start button. True when pressed down.
+  , c_button_start :: Stream Bool
+    -- | Stop button. True when pressed down.
+  , c_button_stop  :: Stream Bool
+
+    -- | Breaths per minute.
+  , c_bpm       :: Stream Word8
 
     -- | I:E ratio numerator: inhale
   , c_ie_inhale :: Stream Word8
@@ -60,7 +88,10 @@ data Controls = Controls
 -- | All controls are external (not derived).
 controls :: Controls
 controls = Controls
-  { c_bpm               = extern "c_bpm"               Nothing
+  { c_mode              = extern "c_mode"              Nothing
+  , c_button_start      = extern "c_button_start"      Nothing
+  , c_button_stop       = extern "c_button_stop"       Nothing
+  , c_bpm               = extern "c_bpm"               Nothing
   , c_ie_inhale         = extern "c_ie_inhale"         Nothing
   , c_ie_exhale         = extern "c_ie_exhale"         Nothing
   , c_volume_limit      = extern "c_volume_limit"      Nothing
@@ -70,6 +101,21 @@ controls = Controls
   , c_cmv_volume_goal   = extern "c_cmv_volume_goal"   Nothing
   , c_cmv_pressure_goal = extern "c_cmv_pressure_goal" Nothing
   }
+
+-- | True whenever the start button becomes pressed (changed, high leading
+-- edge).
+button_start_high_edge :: Stream Bool
+button_start_high_edge = a && not b
+  where
+  a = c_button_start controls
+  b = [False] ++ c_button_start controls
+
+-- | Like 'button_start_high_edge' but for the stop button.
+button_stop_high_edge :: Stream Bool
+button_stop_high_edge = a && not b
+  where
+  a = c_button_stop controls
+  b = [False] ++ c_button_stop controls
 
 -- | True if there is an error in the control values.
 -- For instance, a ridiculously high or low volume limit, or a 0 in the
@@ -177,6 +223,12 @@ ie_exhale_limited :: Stream Word8
 ie_exhale_limited = if operator_choice <= 0 then 1 else operator_choice
   where
   operator_choice = c_ie_exhale controls
+
+cmvVC :: Bool
+cmvVC = False
+
+cmvPC :: Bool
+cmvPC = True
 
 -- | No sanity checking to do here, just give the control stream.
 cmv_mode :: Stream Bool

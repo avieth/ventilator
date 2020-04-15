@@ -16,10 +16,14 @@ bool s_limit_high = false;
  * Operator controls (c_ prefix).
  * These are read by the ventilator system logic.
  */
+//uint8_t c_mode = 0; // CMV
+uint8_t c_mode = 1; // SIMV
+bool c_button_start = false;
+bool c_button_stop = false;
 uint8_t c_bpm = 12;
 uint8_t c_ie_inhale = 0x01;
 uint8_t c_ie_exhale = 0x02;
-bool c_cmv_mode = true;
+bool c_cmv_mode = false; // CMV volume control
 uint32_t c_volume_limit = 1000;
 uint32_t c_pressure_limit = 5000;
 uint32_t c_cmv_volume_goal = 500; //mL
@@ -66,12 +70,14 @@ void setup() {
   digitalWrite(PIN_MOTOR_DIRECTION, HIGH);
   pinMode(PIN_LIMIT_SWITCH_LOWER, INPUT_PULLUP);
   pinMode(PIN_LIMIT_SWITCH_UPPER, INPUT_PULLUP);
+  encoder.write(0);
+  s_encoder_position = 0;
   initializeSensors();
   // Give the display state the relevant pointers, so it can edit them.
   display_state *displayState = setup_display(c_bpm, c_cmv_volume_goal, c_cmv_pressure_goal, c_ie_inhale, c_ie_exhale);
   // TODO FIXME should not need to set up inputs and recordings explicitly
   // here; should be encapsulated in ui_setup or something.
-  inputs_setup(displayState, &c_bpm, &c_cmv_volume_goal, &c_cmv_pressure_goal, &c_ie_inhale, &c_ie_exhale);
+  inputs_setup(displayState, &c_mode, &c_button_start, &c_button_stop, &c_bpm, &c_cmv_volume_goal, &c_cmv_pressure_goal, &c_ie_inhale, &c_ie_exhale);
 }
 
 /**
@@ -110,22 +116,28 @@ void control_motor(long in_us_per_pulse) {
  * called, as it uses the t_delta_us global.
  */
 void step_motor() {
-  static unsigned long time_since_last_pulse_us = 0;
-  static bool current_direction = true;
+  /**
+   * Accumulator in microseconds. We add the time elapsed since the last pulse to this,
+   * and whenever it exceeds the pulse_us we step the motor. Leftovers are carried
+   * forward, so that we can best approximate the desired pulse rate given that we don't
+   * have a hard realtime scheduling guarantee (we share this processor with the
+   * ventilator logic).
+   */
+  static unsigned long accumulator_us = 0;
+  /**
+   * Time in microseconds of the last call to this function.
+   * Defined so that we can compute the time delta between calls.
+   */
+  static unsigned long last_call_us = 0;
+
+  unsigned long now_us = micros();
+  unsigned long delta_us = now_us - last_call_us;
+  last_call_us = now_us;
 
   /**
-   * Some debugging code: it's good to know if the motor stepper is "underrunning", i.e. not
-   * being called often enough, for instance because the system step function takes too long
-   * (floating point math p hard).
+   * Always check for changes in direction.
    */
-  static unsigned long time_at_last_step_motor_us = 0;
-  static unsigned long now_us = micros();
-  if ((pulse_us != 0) && ((now_us - time_at_last_step_motor_us) > pulse_us)) {
-    Serial.println("motor control underrun");
-    now_us = micros();
-  }
-  time_at_last_step_motor_us = now_us;
-  
+  static bool current_direction = true;
   if (motor_direction != current_direction) {
     current_direction = motor_direction;
     if (current_direction) {
@@ -134,57 +146,80 @@ void step_motor() {
       digitalWrite(PIN_MOTOR_DIRECTION, LOW);
     }
   }
-  time_since_last_pulse_us += t_delta_us;
-  // 0 means "do not move"; it does not mean "move infinitely fast".
+  
   if (pulse_us == 0) {
-    return;
-  } else if (time_since_last_pulse_us >= pulse_us) {
-    digitalWrite(PIN_MOTOR_STEP, LOW);
-    digitalWrite(PIN_MOTOR_STEP, HIGH);
-    time_since_last_pulse_us = 0;
+    // We never accrue any debt if the motor is meant to be stationary.
+    accumulator_us = 0;
+  } else {
+    // If the motor is meant to move, we bump up the accumulated debt and pulse
+    // whenever it exceeds. Debt carries forward so that a late pulse might be
+    // made up for in subsequent calls. This also allows us to identify underruns.
+    // TODO FIXME deal with microsecond unsigned long overflow, else we'll get false
+    // underrun positives.
+    accumulator_us = accumulator_us + delta_us;
+    if (accumulator_us >= pulse_us) {
+      digitalWrite(PIN_MOTOR_STEP, LOW);
+      digitalWrite(PIN_MOTOR_STEP, HIGH);
+      accumulator_us = accumulator_us - pulse_us;
+      unsigned long missed = accumulator_us / pulse_us;
+      if (missed > 0) {
+        // LCD display makes it underrun all the time.
+        // TODO make the LCD library non-blocking plz.
+        //Serial.print("motor underrun: missed ");
+        //Serial.print(missed);
+        //Serial.println(" steps(s)");
+        // The serial print takes a lot of time. In this case let's reset the
+        // last call time so that one underrun doesn't artifically cause further
+        // underruns due to the serial print.
+        accumulator_us = 0;
+        last_call_us = micros();
+      }
+    }
   }
 }
 
 /**
- * To be called as often as, and immediately before, the sytsem logic is stepped.
+ * To be called as often as, and immediately before, the sytsem logic is stepped
+ * (by a call to step_system).
  */
 void update_sensors() {
   // TODO FIXME
   // Am I doing direction wrong? I find that forward (positive) direction makes the encoder
   // decrease.
   s_encoder_position = -encoder.read();
-  s_limit_low = digitalRead(PIN_LIMIT_SWITCH_LOWER) == LOW;
+  s_limit_low  = digitalRead(PIN_LIMIT_SWITCH_LOWER) == LOW;
   s_limit_high = digitalRead(PIN_LIMIT_SWITCH_UPPER) == LOW;
 
   /** 
-   *  Sample the sensors and round them to integers.
-   *  
-   *  No redundant sensors so we just copy the values.
+   *  Sample all of the sensors for this frame.
+   *  No redundant sensor hardware at the moment so we just copy the values.
    */
-
-  /**
-   *  Pressure is a float in kPa but we want a whole number Pa so we multiply by 1000.
-   */
-  //s_insp_pressure_1 = lroundf(get_insp_pressure() * 1000.0);
   s_insp_pressure_1 = get_insp_pressure_i();
   s_insp_pressure_2 = s_insp_pressure_2;
-  s_insp_flow_1 = lroundf(get_insp_flow());
+  s_insp_flow_1 = get_insp_flow_i();
   s_insp_flow_2 = s_insp_flow_1;
-  s_exp_flow_1 = lroundf(get_exp_flow());
+  s_exp_flow_1 = get_exp_flow_i();
   s_exp_flow_2 = s_exp_flow_1;
-  s_air_in_flow_1 = lroundf(get_air_in_flow());
+  s_air_in_flow_1 = get_air_in_flow_i();
   s_air_in_flow_2 = s_air_in_flow_1;
-}
 
-/**
- * To be triggered whenever the motor low switch is on (is LOW).
- */
-void zero_encoder() {
-  encoder.write(0);
-  s_encoder_position = 0;
-}
-
-void calibration_change(unsigned char in_c_phase, double in_theta, double in_volume) {
+  /*int16_t irawData = read_sensor_with_offset(INSPFLOW);
+  int32_t ir = flow_rate(irawData);
+  int16_t erawData = read_sensor_with_offset(EXPFLOW);
+  int32_t er = flow_rate(erawData);
+  int16_t prawData = read_sensor_with_offset(INSPPRESSURE);
+  int32_t pr = pressure_difference_i(prawData);
+  Serial.print(irawData);
+  Serial.print(" = ");
+  Serial.print(ir);
+  Serial.print(" : ");
+  Serial.print(erawData);
+  Serial.print(" = ");
+  Serial.println(er);*/
+  //Serial.print(" : ");
+  //Serial.println(prawData);
+  //Serial.print(" : ");
+  //Serial.println(pr);
 }
 
 /**
@@ -216,20 +251,26 @@ void step_system() {
 
 #define DEBUG_INTERVAL 100000
 
-void debug() {
+void debug(int32_t in_enc, int32_t in_enc_low, int32_t in_enc_high) {
   static unsigned long debug_elapsed_us = 0;
   debug_elapsed_us += t_delta_us;
   if (debug_elapsed_us >= DEBUG_INTERVAL) {
+    /*Serial.print(in_enc_low);
+    Serial.print(" : ");
+    Serial.print(in_enc);
+    Serial.print(" : ");
+    Serial.println(in_enc_high);*/
     // Put periodic debug code here if you desire.
     //Serial.println("DEBUG");
     //Serial.print(" insp pressure in Pa: ");
     //Serial.println(s_insp_pressure_1);
     debug_elapsed_us = 0;
+    //Serial.println(pulse_us);
   }
 }
 
 /**
- * Values to be displayed are determines _solely_ by this function (its parameters).
+ * Values to be displayed are determined _solely_ by this function (its parameters).
  * The UI can of course indicate changes to these values, but the actual values must be
  * determined by the ventilator program.
  * 
@@ -239,15 +280,10 @@ void debug() {
  * value, but if it's not the value that the ventilator logic decides to use (maybe it's
  * nonsense) then it will not be displayed.
  */
-void update_ui(long in_flow, long in_volume, long in_pressure, unsigned char in_bpm, unsigned char in_inhale_ratio, unsigned char in_exhale_ratio, bool in_cmv_mode, unsigned long in_cmv_volume_goal, unsigned long in_cmv_pressure_goal) {
-  /*Serial.print(in_pressure);
-  Serial.print(" : ");
-  Serial.print(get_insp_pressure_i());
-  Serial.print(" : ");
-  Serial.print(s_insp_flow_1);
-  Serial.print(" : ");
-  Serial.println(s_exp_flow_1);*/
-  lcd_control(in_bpm, in_volume, ((int32_t) max(0, in_pressure)), in_inhale_ratio, in_exhale_ratio);
+void update_ui(uint8_t in_state, uint8_t in_mode, long in_flow, long in_volume, long in_pressure, unsigned char in_bpm, unsigned char in_inhale_ratio, unsigned char in_exhale_ratio, bool in_cmv_mode, unsigned long in_cmv_volume_goal, unsigned long in_cmv_pressure_goal) {
+  // Updates the LCD memory but does not write to the device; that's done in a separate loop because it's very
+  // very very slow.
+  lcd_control(in_state, in_mode, in_bpm, in_volume, ((int32_t) max(0, in_pressure)), in_inhale_ratio, in_exhale_ratio);
 }
 
 /**
@@ -257,6 +293,8 @@ void loop() {
   update_time();
   step_system();
   step_motor();
+  lcd_display();
+  led_display();
   input_control(micros());
-  debug();
+  //debug();
 }

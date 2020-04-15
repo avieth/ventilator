@@ -30,14 +30,27 @@ uint8_t sensor_pins[SENSOR_COUNT] = {
 /**
  * Only call with one of the defined sensor names above.
  * You get 0 otherwise.
- * Can be negative, in case the pin reads less than the offset.
+ * 
+ * The readings are corrected for the offset of that sensor (determined
+ * by initializeSensors. If the reading is below the offset, you get a
+ * negative number. Use read_sensor_with_offset_nonnegative if you don't
+ * want that.
+ * 
  */
 int16_t read_sensor_with_offset(uint8_t sensor_id) {
   if (sensor_id < SENSOR_COUNT) {
-    return read_sensor(sensor_pins[sensor_id]) - sensor_offsets[sensor_id];
+    return ((int16_t) read_sensor(sensor_pins[sensor_id])) - sensor_offsets[sensor_id];
   } else {
     return 0;
   }
+}
+
+/**
+ * read_sensor_with_offset but nonnegative.
+ */
+uint16_t read_sensor_with_offset_nonnegative(uint8_t sensor_id) {
+  int16_t reading = read_sensor_with_offset(sensor_id);
+  return (reading < 0) ? 0 : ((uint16_t) reading);
 }
 
 /**
@@ -64,21 +77,13 @@ bool initializeSensors(){
  * TODO delete, we have an integral version.
  */
 float get_insp_pressure() {
-  int32_t rawData = read_sensor_with_offset(INSPPRESSURE);
+  uint16_t rawData = read_sensor_with_offset(INSPPRESSURE);
   return pressure_difference(rawData);
 }
 
 int32_t get_insp_pressure_i() {
-  int32_t a = pressure_difference_i(read_sensor_with_offset(INSPPRESSURE));
-  int32_t b = pressure_difference_i(read_sensor_with_offset(INSPPRESSURE));
-  int32_t c = pressure_difference_i(read_sensor_with_offset(INSPPRESSURE));
-  int32_t d = pressure_difference_i(read_sensor_with_offset(INSPPRESSURE));
-  int32_t avg = (a + b + c + d) / 4;
-  if (abs(avg) <= 10) {
-    return 0;
-  } else {
-    return avg;
-  }
+  // TODO fix integral computation, do not round.
+  return lroundf(pressure_difference_i(read_sensor_with_offset(INSPPRESSURE)));
 }
 
 /**
@@ -86,13 +91,14 @@ int32_t get_insp_pressure_i() {
  * TODO make it integral.
  */
 float get_insp_flow() {
-  int32_t rawData = read_sensor_with_offset(INSPFLOW);
+  uint16_t rawData = read_sensor_with_offset(INSPFLOW);
   return flow_rate(rawData);
 }
 
 int32_t get_insp_flow_i() {
-  int32_t rawData = read_sensor_with_offset(INSPFLOW);
-  return flow_rate_i(rawData);
+  // TODO fix integral computation, do not round.
+  uint16_t rawData = read_sensor_with_offset(INSPFLOW);
+  return lroundf(flow_rate(rawData));
 }
 
 /**
@@ -100,8 +106,14 @@ int32_t get_insp_flow_i() {
  * TODO make it integral.
  */
 float get_exp_flow() {
-  int32_t rawData = read_sensor_with_offset(EXPFLOW);
+  uint16_t rawData = read_sensor_with_offset(EXPFLOW);
   return flow_rate(rawData); 
+}
+
+int32_t get_exp_flow_i() {
+  // TODO fix integral computation, do not round.
+  uint16_t rawData = read_sensor_with_offset(EXPFLOW);
+  return lroundf(flow_rate(rawData));
 }
 
 /**
@@ -109,10 +121,15 @@ float get_exp_flow() {
  * TODO make it integral
  */
 float get_air_in_flow() {
-  int32_t rawData = read_sensor_with_offset(AIRINFLOW);
+  uint16_t rawData = read_sensor_with_offset(AIRINFLOW);
   return flow_rate(rawData); 
 }
 
+int32_t get_air_in_flow_i() {
+  // TODO fix integral computation, do not round.
+  uint16_t rawData = read_sensor_with_offset(AIRINFLOW);
+  return lroundf(flow_rate(rawData));
+}
 
 //COMPUTED VOLUMES
 

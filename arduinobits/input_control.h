@@ -1,9 +1,9 @@
 #define INPUTS_CONTROL_RATE           50000
 
 #define DEBOUNCE_LIMIT                400000
-#define START_STOP_LIMIT              2000000
 #define CURSOR_ACTIVITY_LIMIT         6000000
-#define START_STOP_CONFIRM_LIMIT      4000000 
+// How long must the mode button be pressed before the mode is changed?
+#define MODE_CONFIRM_TIME             1000000
 
 #define MAX_INDEX                     3
 
@@ -31,12 +31,11 @@
 #define BUTTON_LEFT                   15
 #define BUTTON_RIGHT                  14
 #define BUTTON_CONFIRM                4
-#define BUTTON_START_STOP             5
+#define BUTTON_STOP                   5
 
 #define START_LED                     A6
 
 typedef struct ctrls{     
-  int startStopEventFlag;
   int rotationCount;
   Encoder *enc;
 }controls;
@@ -50,6 +49,9 @@ typedef struct input_state {
 
   // These pointers will be written with new values whenever there is
   // a commit. See corresponding stuff in display_state.
+  uint8_t *mode;
+  bool *button_start;
+  bool *button_stop;
   uint8_t *bpm;
   uint32_t *volume;
   uint32_t *pressure;
@@ -61,7 +63,7 @@ typedef struct input_state {
 input_state inputState;
 
 
-input_state *inputs_setup(display_state *displayState, uint8_t *in_bpm_ptr, uint32_t *in_volume_ptr, uint32_t *in_pressure_ptr, uint8_t *in_ie_inhale_ptr, uint8_t *in_ie_exhale_ptr);
+input_state *inputs_setup(display_state *displayState, uint8_t *in_mode_ptr, bool *in_button_start_ptr, bool *in_button_stop_ptr, uint8_t *in_bpm_ptr, uint32_t *in_volume_ptr, uint32_t *in_pressure_ptr, uint8_t *in_ie_inhale_ptr, uint8_t *in_ie_exhale_ptr);
 
 int cursorIndex_manager(int cursorActive, int cursorIndex, int increment);
 int value_change_manager(int currentEncoderValue, int pastEncoderValue, int resetFlag);
@@ -82,12 +84,15 @@ void input_control(long currenTime);
 /**
  * Prepares the input state and returns a pointer to it.
  */
-input_state *inputs_setup(display_state *displayState, uint8_t *in_bpm_ptr, uint32_t *in_volume_ptr, uint32_t *in_pressure_ptr, uint8_t *in_ie_inhale_ptr, uint8_t *in_ie_exhale_ptr){
+input_state *inputs_setup(display_state *displayState, uint8_t *in_mode_ptr, bool *in_button_start_ptr, bool *in_button_stop_ptr, uint8_t *in_bpm_ptr, uint32_t *in_volume_ptr, uint32_t *in_pressure_ptr, uint8_t *in_ie_inhale_ptr, uint8_t *in_ie_exhale_ptr){
   pinMode(START_LED, OUTPUT);
-  digitalWrite(START_LED, HIGH);
+  digitalWrite(START_LED, LOW);
   inputState.input_controls.enc = new Encoder(KNOB_ENC_A, KNOB_ENC_B);
   inputState.input_controls.enc->write(0);
   inputState.input_display_state = displayState;
+  inputState.mode = in_mode_ptr;
+  inputState.button_start = in_button_start_ptr;
+  inputState.button_stop = in_button_stop_ptr;
   inputState.bpm = in_bpm_ptr;
   inputState.volume = in_volume_ptr;
   inputState.pressure = in_pressure_ptr;
@@ -310,9 +315,8 @@ void read_inputs(long currentTime, int timerReset){
   static long buttonLeftTimeout = 0;
   static long buttonRightTimeout = 0;
   static long buttonConfirmTimeout = 0;
-  static long startStopEventTimeout = 0;
   static long cursorActivityTimeout = 0;
-  static long startStopConfirmTimeout = 0;
+  static long modeConfirmTimeout = 0;
 
   int currentEncoderReading;
   
@@ -341,46 +345,55 @@ void read_inputs(long currentTime, int timerReset){
     }
   }
 
-  
-  if(currentTime - buttonConfirmTimeout >= DEBOUNCE_LIMIT){
-    if(digitalRead(BUTTON_CONFIRM)){
-
-      if(measurements->startStopStateFlag){
-        measurements->startStopStateFlag = 0;
-        digitalWrite(START_LED, measurements->startStopState);
-      }
-
+  // Confirm button doubles as start. It's disambiguated by the measurements->valueSet flag.
+  // TODO TBD confirm this is correct.
+  if (digitalRead(BUTTON_CONFIRM)) {
+    if ((measurements->cursorActive == 1) && (currentTime - buttonConfirmTimeout >= DEBOUNCE_LIMIT)) {
       // TODO factor this out into its own routine for clarity: commits the changes.
+      // Make it uniform for the "mode" setting as well; it should be set just like the
+      // others.
       *(inputState.bpm) = inputState.input_display_state->breathRate;
       *(inputState.volume) = inputState.input_display_state->tidalVolume;
       *(inputState.pressure) = inputState.input_display_state->pPeak;
       *(inputState.ie_inhale) = inputState.input_display_state->ieInhale;
       *(inputState.ie_exhale) = inputState.input_display_state->ieExhale;
-
       
       measurements->valueSet = 1;
       buttonConfirmTimeout = currentTime;
+    } else if (measurements->cursorActive == 0) {
+      *(inputState.button_start) = true;
     }
+  } else {
+    *(inputState.button_start) = false;
   }
 
+  if (digitalRead(BUTTON_STOP)){
+    *(inputState.button_stop) = true;  
+  } else {
+    *(inputState.button_stop) = false;
+  }
 
-  if(digitalRead(BUTTON_START_STOP)){
-    if(currentTime - startStopEventTimeout >= START_STOP_LIMIT){
-      startStopEventTimeout = currentTime;
-
-      if(inputs->startStopEventFlag){
-        startStopConfirmTimeout = currentTime;
-        measurements->startStopState = !measurements->startStopState;
-        measurements->startStopStateFlag = 1;    
+  // Hold the mode button for 2 seconds and the mode changes.
+  /*static long modeEventBegin = 0;
+  // Set to 1 when the button is pressed, back to 0 when it's released, and 2 after the
+  // change is committed.
+  static uint8_t modeEventFlag = 0;
+  if(digitalRead(BUTTON_MODE)){
+    if (modeEventFlag == 0) {
+      modeEventBegin = currentTime;
+      modeEventFlag = 1;
+    }
+    if (modeEventFlag == 1) {
+      if ((currentTime - modeEventBegin) >= MODE_CONFIRM_TIME) {
+        // FIXME better input story. Shouldn't need to know that there are 3 modes.
+        measurements->modeState = (measurements->modeState + 1) % 3;
+        *(inputState.mode) = measurements->modeState;
+        modeEventFlag = 2;
       }
-
-          
-      inputs->startStopEventFlag = 1;
     }
-  }
-  else{
-    inputs->startStopEventFlag = 0;
-  }
+  } else {
+    modeEventFlag = 0;
+  }*/
 
 
   //encoder
@@ -401,21 +414,11 @@ void read_inputs(long currentTime, int timerReset){
     measurements->cursorActive = 0;
   }
 
-
-  if(currentTime - startStopConfirmTimeout >= START_STOP_CONFIRM_LIMIT){
-    if(measurements->startStopStateFlag){
-      measurements->startStopStateFlag = 0;
-      measurements->startStopState = !measurements->startStopState;      
-    }
-  }
-
   if(timerReset){
     buttonLeftTimeout = 0;
     buttonRightTimeout = 0;
     buttonConfirmTimeout = 0;
-    startStopEventTimeout = 0;
     cursorActivityTimeout = 0;
-    startStopConfirmTimeout = 0;  
   }
 }
 

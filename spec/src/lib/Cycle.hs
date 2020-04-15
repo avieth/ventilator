@@ -1,5 +1,7 @@
 {-# LANGUAGE RebindableSyntax #-}
 
+-- TODO move this into the Mode subdirectory.
+
 module Cycle
   ( cycle_duration_us
   , inhale_duration_us
