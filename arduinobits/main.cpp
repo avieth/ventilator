@@ -98,12 +98,12 @@ displayData display_data = {
   .ieExhale = c_ie_exhale,
   .tidalVolume = 0,
   .pressurePeak = 0,
-  .peep = 0,
-  .oxygen = 0
+  .peep = 200,
+  .oxygen = 100
 };
 
 /**
- * TODO fill this using ventilator variables.
+ * References to which the UI will write.
  */
 displayWriteData write_data = {
   .mode = &c_mode,
@@ -158,7 +158,6 @@ void buttonMain(bool pressed) {
   } else {
     last_us = now_us;
   }
-  // TODO debounce?
   if (pressed) {
     if (ui_editing) {
       ui_focus->deselect(true, &write_data);
@@ -247,56 +246,10 @@ void ui_loop(uint32_t now_us) {
    * For all states other than ready or running, the display is completely
    * determined by the display data (not user input interactions).
    *
-   * TODO re-enable. It's disabled now in the testing build.
    */
-  /*if ((display_data.state != DISPLAY_STATE_READY) && (display_data.state != DISPLAY_STATE_RUNNING)) {
+  if ((display_data.state != DISPLAY_STATE_READY) && (display_data.state != DISPLAY_STATE_RUNNING)) {
     return;
-  }*/
-
-  // TBD souldn't we always display_format_running? We draw over it, right?
-
-  /**
-   * Here we are in an input-accepting state.
-   * Sub states are:
-   * - Nothing selected
-   * - Selecting fields (shows a cursor)
-   * - Field selected for change (shows brackets around it)
-   *   - Must have a pointer to the thing to change and a temporary variable
-   *     for display.
-   *
-   * How to do this? Overlay!
-   *
-   */
-
-  // What do we need for state?
-  // - Is there a field selected by the knob?
-  // - Is that field being edited?
-  // - If so:
-  //   - What's the interim value?
-  //   - What's the pointer to the target to write?
-  //   - 
-
-  // Supposing we have an array with
-  //   highlight
-  //   select
-  // callbacks. In base mode, turning the knob will iterate through that list
-  // modulo its length in either direction, calling highlight on the one
-  // chosen (or nothing if it's -1, which is set after a timeout).
-  // If a button is pressed and this index is nonzero, we call select. This will
-  // overlay brackets around the item and must hold the value at the current
-  // spot.
-  //
-  //
-  // Ok. On encoder change (here)
-  // - If we're not editing, use next_display_data to get the next thing
-  // - If we're editing, then use the display input data that you have and
-  //   call change()
-  // Then the rest is done by button interrupt
-  // - If confirm is pressed and we have a display input data, call deselect
-  //   with true (and the global data pointers).
-  // - If abort is pressed do the same but with false
-  // There is also a timeout? Nah
-  // The 'editing' flag is set by interrupts.
+  }
 
   ui_focus->highlight(ui_editing);
 
@@ -552,8 +505,8 @@ void update_ui(uint8_t in_state, uint8_t in_mode, long in_flow, long in_volume, 
   display_data.volumeLimit = in_cmv_volume_goal;
   display_data.pressurePeak = in_pressure;
   display_data.pressureLimit = in_cmv_pressure_goal;
-  display_data.peep = 0;
-  display_data.oxygen = 0;
+  display_data.peep = 200;
+  display_data.oxygen = 100;
 }
 
 /**
