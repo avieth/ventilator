@@ -15,5 +15,4 @@ extern uint32_t c_cmv_pressure_goal;
 void raise_alarm(void);
 void update_ui(uint8_t state, uint8_t mode, int32_t flow, int32_t volume_ml, int32_t pressure, uint8_t bpm_limited, uint8_t ie_inhale, uint8_t ie_exhale, bool cmv_mode, uint32_t cmv_volume_goal, uint32_t cmv_pressure_goal);
 void control_motor(int32_t us_per_pulse);
-void debug(int32_t encoder, int32_t encoder_low, int32_t encoder_high);
 void step(void);

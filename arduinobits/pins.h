@@ -1,6 +1,10 @@
+#include <Arduino.h>
+
 /**
  * Preprocessor definitions relating to the pin identifiers for motor
  * control, sensors, etc.
+ *
+ * Display and input pins are not defined here.
  */
 
 /**
@@ -28,6 +32,8 @@
  * 
  * LOWER means fully retracted (patient has exhaled)
  * UPPER means the opposite: no more air can be pushed.
+ *
+ * TODO proper pins. dunno what they will be on the due.
  */
-#define PIN_LIMIT_SWITCH_LOWER A13
-#define PIN_LIMIT_SWITCH_UPPER A14
+#define PIN_LIMIT_SWITCH_LOWER 19
+#define PIN_LIMIT_SWITCH_UPPER 20

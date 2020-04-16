@@ -93,12 +93,6 @@ safe_to_move = not alarm
 spec :: Spec
 spec = do
 
-  trigger "debug" true
-    [ arg_named "encoder" encoder_position
-    , arg_named "encoder_low" encoder_position_low
-    , arg_named "encoder_high" encoder_position_high
-    ]
-
   -- At every step call into
   --
   --   void control_motor(uint32_t us_per_pulse)

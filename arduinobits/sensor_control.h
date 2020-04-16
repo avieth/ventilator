@@ -62,7 +62,7 @@ int32_t smooth(int32_t x, int32_t y, int32_t z) {
 
 //INITIALIZATION 
 
-bool initializeSensors(){
+void initializeSensors(){
   sensor_offsets[INSPPRESSURE] = sensor_offset(sensor_pins[INSPPRESSURE]);
   sensor_offsets[INSPFLOW]     = sensor_offset(sensor_pins[INSPFLOW]);
   sensor_offsets[EXPFLOW]      = sensor_offset(sensor_pins[EXPFLOW]);
