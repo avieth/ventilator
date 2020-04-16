@@ -18,8 +18,7 @@ bool s_limit_high = false;
  * Operator controls (c_ prefix).
  * These are read by the ventilator system logic.
  */
-//uint8_t c_mode = 0; // CMV
-uint8_t c_mode = 1; // SIMV
+uint8_t c_mode = 0; // CMV
 bool c_button_start = false;
 bool c_button_stop = false;
 uint8_t c_bpm = 12;
@@ -30,7 +29,7 @@ uint32_t c_volume_limit = 1000;
 uint32_t c_pressure_limit = 5000;
 uint32_t c_cmv_volume_goal = 500; //mL
 uint32_t c_cmv_pressure_goal = 2000; //Pa
-uint32_t c_peep = 200;
+uint32_t c_peep = 2;
 
 /**
  * Globals for sensor data.
@@ -40,12 +39,12 @@ uint32_t c_peep = 200;
  */
 int32_t s_insp_pressure_1 = 0;
 int32_t s_insp_pressure_2 = 0;
-int32_t s_insp_flow_1 = 0;
-int32_t s_insp_flow_2 = 0;
-int32_t s_exp_flow_1 = 0;
-int32_t s_exp_flow_2 = 0;
-int32_t s_air_in_flow_1 = 0;
-int32_t s_air_in_flow_2 = 0;
+uint32_t s_insp_flow_1 = 0;
+uint32_t s_insp_flow_2 = 0;
+uint32_t s_exp_flow_1 = 0;
+uint32_t s_exp_flow_2 = 0;
+uint32_t s_air_in_flow_1 = 0;
+uint32_t s_air_in_flow_2 = 0;
 
 /**
  * The time leapsed (in microseconds) since the last loop() call.
@@ -219,11 +218,21 @@ void ui_loop(uint32_t now_us) {
     display_speaker(true);
     display_led_red(true);
   } else if (display_data.state == DISPLAY_STATE_CALIBRATING) {
+    display_speaker(false);
     display_led_green_flashing(now_us, 250000);
+    display_led_red(false);
   } else if (display_data.state == DISPLAY_STATE_READY) {
+    display_speaker(false);
     display_led_green_flashing(now_us, 1000000);
+    display_led_red(false);
+  } else if (display_data.state == DISPLAY_STATE_RESETTING) {
+    display_speaker(false);
+    display_led_red_flashing(now_us, 250000);
+    display_led_green(false);
   } else if (display_data.state == DISPLAY_STATE_RUNNING) {
+    display_speaker(false);
     display_led_green(true);
+    display_led_red(false);
   }
 
   /**
@@ -426,10 +435,7 @@ void step_motor(uint32_t now_us) {
  * (by a call to step_system).
  */
 void update_sensors() {
-  // TODO FIXME
-  // Am I doing direction wrong? I find that forward (positive) direction makes the encoder
-  // decrease.
-  s_encoder_position = -encoder.read();
+  s_encoder_position = encoder.read();
   s_limit_low  = digitalRead(PIN_LIMIT_SWITCH_LOWER) == LOW;
   s_limit_high = digitalRead(PIN_LIMIT_SWITCH_UPPER) == LOW;
 
@@ -437,14 +443,20 @@ void update_sensors() {
    *  Sample all of the sensors for this frame.
    *  No redundant sensor hardware at the moment so we just copy the values.
    */
-  s_insp_pressure_1 = get_insp_pressure_i();
+  s_insp_pressure_1 = lroundf(get_insp_pressure());
   s_insp_pressure_2 = s_insp_pressure_2;
-  s_insp_flow_1 = get_insp_flow_i();
+  s_insp_flow_1 = lroundf(get_insp_flow());
   s_insp_flow_2 = s_insp_flow_1;
-  s_exp_flow_1 = get_exp_flow_i();
+  s_exp_flow_1 = lroundf(get_exp_flow());
   s_exp_flow_2 = s_exp_flow_1;
-  s_air_in_flow_1 = get_air_in_flow_i();
+  s_air_in_flow_1 = lroundf(get_air_in_flow());
   s_air_in_flow_2 = s_air_in_flow_1;
+  //SerialUSB.print("Pa: ");
+  //SerialUSB.print(get_insp_pressure());
+  //SerialUSB.print(" Flow insp: ");
+  //SerialUSB.print(s_insp_flow_1);
+  //SerialUSB.print(" Flow exp: ");
+  //SerialUSB.println(s_exp_flow_1);
 }
 
 /**
@@ -476,13 +488,17 @@ void step_system() {
 
 #define DEBUG_INTERVAL 100000
 
+/*
 void debug(uint32_t now_us) {
   static unsigned long debug_elapsed_us = 0;
   debug_elapsed_us += t_delta_us;
   if (debug_elapsed_us >= DEBUG_INTERVAL) {
+    SerialUSB.print(s_encoder_position);
+    SerialUSB.print(" : ");
+    SerialUSB.println(pulse_us);
     debug_elapsed_us = 0;
   }
-}
+}*/
 
 /**
  * Values to be displayed are determined _solely_ by this function (its parameters).
@@ -495,7 +511,20 @@ void debug(uint32_t now_us) {
  * value, but if it's not the value that the ventilator logic decides to use (maybe it's
  * nonsense) then it will not be displayed.
  */
-void update_ui(uint8_t in_state, uint8_t in_mode, long in_flow, long in_volume, long in_pressure, unsigned char in_bpm, unsigned char in_inhale_ratio, unsigned char in_exhale_ratio, bool in_cmv_mode, unsigned long in_cmv_volume_goal, unsigned long in_cmv_pressure_goal) {
+void update_ui(
+    uint8_t in_state,
+    uint8_t in_mode,
+    uint32_t in_flow,
+    uint32_t in_flow_exp,
+    int32_t in_volume,
+    int32_t in_pressure,
+    uint32_t in_oxygen,
+    unsigned char in_bpm,
+    unsigned char in_inhale_ratio,
+    unsigned char in_exhale_ratio,
+    bool in_cmv_mode,
+    unsigned long in_cmv_volume_goal,
+    unsigned long in_cmv_pressure_goal) {
   display_data.state = in_state;
   display_data.mode = in_mode;
   display_data.bpm = in_bpm;
@@ -520,5 +549,5 @@ void loop() {
   input_poll(now_us);
   ui_loop(now_us);
   display_draw(now_us);
-  debug(now_us);
+  //debug(now_us);
 }

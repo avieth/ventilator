@@ -71,7 +71,7 @@ state = current
       if button_start_high_edge
       then constant sRESETTING
       else if button_stop_high_edge
-      then constant sCALIBRATING
+      then constant sRESETTING
       else constant sSTOPPED
     else if current == constant sRESETTING
     then
@@ -170,12 +170,12 @@ velocity_ready :: Stream Int32
 velocity_ready =
   if (encoder_position - encoder_position_low) <= 2
   then constant 0
-  else constant (-30)
+  else constant (-15)
 
 -- | RESET
 
 velocity_resetting :: Stream Int32
-velocity_resetting = constant (-30)
+velocity_resetting = constant (-15)
 
 end_reset :: Stream Bool
 end_reset = low_switch

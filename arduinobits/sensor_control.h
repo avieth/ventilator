@@ -19,7 +19,7 @@
 #define EXPFLOW 2
 #define AIRINFLOW 3
 
-int16_t sensor_offsets[SENSOR_COUNT] = { 0, 0, 0, 0 };
+uint16_t sensor_offsets[SENSOR_COUNT] = { 0, 0, 0, 0 };
 uint8_t sensor_pins[SENSOR_COUNT] = { 
     PIN_INSP_PRESSURE,
     PIN_INSP_FLOW,
@@ -37,9 +37,15 @@ uint8_t sensor_pins[SENSOR_COUNT] = {
  * want that.
  * 
  */
-int16_t read_sensor_with_offset(uint8_t sensor_id) {
+uint16_t read_sensor_with_offset(uint8_t sensor_id) {
   if (sensor_id < SENSOR_COUNT) {
-    return ((int16_t) read_sensor(sensor_pins[sensor_id])) - sensor_offsets[sensor_id];
+    uint16_t reading = read_sensor(sensor_pins[sensor_id]);
+    uint16_t offset = sensor_offsets[sensor_id];
+    if (reading < offset) {
+      return 0;
+    } else {
+      return reading - offset;
+    }
   } else {
     return 0;
   }
@@ -63,6 +69,7 @@ int32_t smooth(int32_t x, int32_t y, int32_t z) {
 //INITIALIZATION 
 
 void initializeSensors(){
+  analogReadResolution(12);
   sensor_offsets[INSPPRESSURE] = sensor_offset(sensor_pins[INSPPRESSURE]);
   sensor_offsets[INSPFLOW]     = sensor_offset(sensor_pins[INSPFLOW]);
   sensor_offsets[EXPFLOW]      = sensor_offset(sensor_pins[EXPFLOW]);
@@ -81,24 +88,14 @@ float get_insp_pressure() {
   return pressure_difference(rawData);
 }
 
-int32_t get_insp_pressure_i() {
-  // TODO fix integral computation, do not round.
-  return lroundf(pressure_difference_i(read_sensor_with_offset(INSPPRESSURE)));
-}
-
 /**
  * Inspiration flow at this instant.
  * TODO make it integral.
  */
 float get_insp_flow() {
   uint16_t rawData = read_sensor_with_offset(INSPFLOW);
-  return flow_rate(rawData);
-}
-
-int32_t get_insp_flow_i() {
-  // TODO fix integral computation, do not round.
-  uint16_t rawData = read_sensor_with_offset(INSPFLOW);
-  return lroundf(flow_rate(rawData));
+  float r = flow_rate(rawData);
+  return r;
 }
 
 /**
@@ -107,13 +104,8 @@ int32_t get_insp_flow_i() {
  */
 float get_exp_flow() {
   uint16_t rawData = read_sensor_with_offset(EXPFLOW);
-  return flow_rate(rawData); 
-}
-
-int32_t get_exp_flow_i() {
-  // TODO fix integral computation, do not round.
-  uint16_t rawData = read_sensor_with_offset(EXPFLOW);
-  return lroundf(flow_rate(rawData));
+  float r = flow_rate(rawData);
+  return r;
 }
 
 /**
@@ -122,13 +114,8 @@ int32_t get_exp_flow_i() {
  */
 float get_air_in_flow() {
   uint16_t rawData = read_sensor_with_offset(AIRINFLOW);
-  return flow_rate(rawData); 
-}
-
-int32_t get_air_in_flow_i() {
-  // TODO fix integral computation, do not round.
-  uint16_t rawData = read_sensor_with_offset(AIRINFLOW);
-  return lroundf(flow_rate(rawData));
+  float r = flow_rate(rawData);
+  return r;
 }
 
 //COMPUTED VOLUMES

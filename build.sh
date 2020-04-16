@@ -8,7 +8,7 @@ cp -r $src $TMP/
 
 cd $TMP
 
-COMPILE=$duebuilder/compile
+COMPILE="$duebuilder/compile -O2"
 LINK=$duebuilder/link
 ERASE=$duebuilder/erase
 BOSSAC=$duebuilder/bossac

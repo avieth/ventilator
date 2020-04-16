@@ -324,15 +324,17 @@ void display_format_running(displayData *data) {
   display_clear();
   /* Header */
   if (data->state == DISPLAY_STATE_CALIBRATING) {
-    display_string(0, 0, 5, "CALIB");
+    display_string(0, 0, 7, "CALIB  ");
   } else if (data->state == DISPLAY_STATE_READY) {
-    display_string(0, 0, 5, "READY");
+    display_string(0, 0, 7, "READY  ");
   } else if (data->state == DISPLAY_STATE_RUNNING) {
     display_string(0, 0, 7, "RUNNING");
   } else if (data->state == DISPLAY_STATE_STOPPED) {
-    display_string(0, 0, 8, "STOPPED");
+    display_string(0, 0, 7, "STOPPED");
+  } else if (data->state == DISPLAY_STATE_RESETTING) {
+    display_string(0, 0, 7, "RESET  ");
   } else if (data->state == DISPLAY_STATE_ERROR) {
-    display_string(0, 0, 5, "ERROR");
+    display_string(0, 0, 7, "ERROR  ");
   }
   /* Mode */
   display_string(1, 1, 3, "Mo:");

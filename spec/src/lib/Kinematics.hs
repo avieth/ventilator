@@ -91,7 +91,7 @@ l = constant 85.0
 -- | Length of the arm piece attached to the bellows and to the other
 -- arm piece, in millimeters.
 big_l :: Stream Double
-big_l = constant 120.0
+big_l = constant 140.0
 
 -- | How far above the rail is the joint between the bellows and the long
 -- arm (big_l), in millimeters

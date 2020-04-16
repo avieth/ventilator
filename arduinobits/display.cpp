@@ -76,6 +76,16 @@ void display_led_red(bool on) {
   }
 }
 
+void display_led_red_flashing(uint32_t now_us, uint32_t interval_us) {
+  static uint32_t last_us = 0;
+  static bool current = false;
+  if ((now_us - last_us) >= interval_us) {
+    display_led_red(!current);
+    current = !current;
+    last_us = now_us;
+  }
+}
+
 void display_clear() {
   display_clear(0, 0, LCD_SIZE());
 }

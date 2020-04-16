@@ -52,9 +52,6 @@ import qualified State as State
 pulsedata :: PulseData
 pulsedata = pulse_data_from_velocity_dps motor_velocity
 
-peak_pressure :: Stream Int32
-peak_pressure = constant 0
-
 -- This is essentially the "main" routine: compute the motor velocity at
 -- an instant.
 motor_velocity :: Stream Int32
@@ -102,7 +99,7 @@ spec = do
     ]
 
   -- Update the UI, subject to rate limiting because it may be too expensive.
-  trigger "update_ui" (every_us 200000) [
+  trigger "update_ui" (every_us 50000) [
 
       arg_named "state" State.state
     , arg_named "mode" Controls.mode
@@ -111,10 +108,11 @@ spec = do
     -- volume is computed as usual from the motor position.
     -- flow is taken to be the change in volume at the current motor
     -- velocity.
-    -- TODO use sensors.
-    , arg_named "flow"      $ (constant 0 :: Stream Int32)
+    , arg_named "flow_insp" $ Sensors.flow_insp
+    , arg_named "flow_exp"  $ Sensors.flow_exp
     , arg_named "volume_ml" $ (unsafeCast (unsafeCast (volume_f / 1000.0) :: Stream Int64) :: Stream Int32)
-    , arg_named "pressure" $ peak_pressure
+    , arg_named "pressure"  $ Sensors.pressure
+    , arg_named "oxygen"    $ Sensors.oxygen
 
     , arg_named "bpm_limited"    $ bpm_limited
     , arg_named "ie_inhale"      $ ie_inhale_limited

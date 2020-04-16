@@ -18,8 +18,8 @@
 /** 
  * Rotary encoder.
  */
-#define PIN_ENC_0 20
-#define PIN_ENC_1 21
+#define PIN_ENC_0 19
+#define PIN_ENC_1 20
 
 /**
  * Motor control: direction and step.
@@ -33,7 +33,11 @@
  * LOWER means fully retracted (patient has exhaled)
  * UPPER means the opposite: no more air can be pushed.
  *
- * TODO proper pins. dunno what they will be on the due.
+ * Some refer to LOWER as the switch at the "bottom" of the machine, but that
+ * requires a physical frame of reference outside of the machine itself.
+ * IMO it makes more sense to designate LOWER and UPPER in the metaphor of
+ * how much work has been done. When the motor pushes the piston it gets
+ * higher, because work is done.
  */
-#define PIN_LIMIT_SWITCH_LOWER 19
-#define PIN_LIMIT_SWITCH_UPPER 20
+#define PIN_LIMIT_SWITCH_LOWER 18
+#define PIN_LIMIT_SWITCH_UPPER 17

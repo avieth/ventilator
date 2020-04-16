@@ -43,11 +43,11 @@ cmv is_running = local (subcycle_time_remaining is_running) $ \t_remaining_us ->
           -- angular delta. Reverse kinematics is expensive though.
           -- WHAT IF we compute that only at te beginning of the cycle?
           else if (unsafeCast Controls.cmv_volume_goal_limited - v_now) > 100
-          then 90
-          else 45
+          then 55
+          else 25
       else if Controls.cmv_mode == constant Controls.cmvPC
         -- TODO use observed pressure and pressure goal.
-        then 45
+        then 25
       else 0
     -- < 0 means exhaling.
     else if t_remaining_us < 0

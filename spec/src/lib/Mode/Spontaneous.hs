@@ -23,19 +23,19 @@ simv is_running = local (subcycle is_running) $ \sc ->
       then if v_now >= (unsafeCast Controls.cmv_volume_goal_limited)
       then 0
       else if (unsafeCast Controls.cmv_volume_goal_limited - v_now) > 100
-      then 90
-      else 45
+      then 55
+      else 25
       else if Controls.cmv_mode == constant Controls.cmvPC
-      then 45
+      then 25
       else 0
     else if sc == 1
     -- exhale
     then if tr_us > (constant (-10))
       then 0
-      else ((md_encoder_position encoder_position_low encoder_position) * 2000) `div` (-tr_us)
+      else ((md_encoder_position encoder_position_low encoder_position) * 1000) `div` (-tr_us)
     else if sc == 2
     -- spontaneous inhale
-    then 30
+    then 20
     else 0
 
 -- Subcycle codes:
@@ -63,7 +63,7 @@ subcycle is_running = stream
       else constant 0
     else if stream == constant 1
     then
-      if inhale_accumulator > 10
+      if inhale_accumulator > 50
       -- Spontaneous inhale on exhale cycle
       then constant 2
       -- Exhale phase expired
@@ -72,7 +72,7 @@ subcycle is_running = stream
       then constant 0
       else constant 1
     else if stream == constant 2
-    then if inhale_accumulator < 10
+    then if exhale_accumulator > 10
       -- Inhale stopped, go back to exhale.
       then constant 1
       else constant 2

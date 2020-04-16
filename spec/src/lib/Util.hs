@@ -33,3 +33,16 @@ integral c s = stream
   where
   stream = [c] ++ next
   next = s + stream
+
+-- | 'integral' but there's a Bool stream which resets the integral to a
+-- given value whenever it is true.
+integral_
+  :: (Num a, Eq a, Typed a)
+  => Stream Bool
+  -> Stream a
+  -> Stream a
+  -> Stream a
+integral_ reset c x = sums
+  where
+  sums = [0] ++ next_sums
+  next_sums = if reset then c else x + sums

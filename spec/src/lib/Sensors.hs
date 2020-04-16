@@ -18,6 +18,12 @@ module Sensors
   , exhale
   , accumulator
   , OxygenSensors (..)
+
+  , flow_insp
+  , flow_exp
+  , pressure
+  , oxygen
+  , volume
   ) where
 
 import Language.Copilot hiding (max)
@@ -67,7 +73,6 @@ oxygen_sensors = OxygenSensors
 -- TODO units?
 data PressureSensors = PressureSensors
   { s_insp_pressure :: WithRedundancy Int32
-  , s_exp_pressure :: WithRedundancy Int32
   }
 
 pressure_sensors :: PressureSensors
@@ -77,19 +82,14 @@ pressure_sensors = PressureSensors
       , redundant = extern "s_insp_pressure_2" Nothing
       , threshold = extern "s_insp_pressure_t" Nothing
       }
-  , s_exp_pressure = WithRedundancy
-      { principal = extern "s_exp_pressure_1" Nothing
-      , redundant = extern "s_exp_pressure_2" Nothing
-      , threshold = extern "s_exp_pressure_t" Nothing
-      }
   }
 
 -- | Organizational record for sensors relating to flow, for patient-initiated
 -- (spontaneous) breaths.
 data FlowSensors = FlowSensors
-  { s_insp_flow :: WithRedundancy Int32
-  , s_exp_flow :: WithRedundancy Int32
-  , s_air_in_flow :: WithRedundancy Int32
+  { s_insp_flow   :: WithRedundancy Word32
+  , s_exp_flow    :: WithRedundancy Word32
+  , s_air_in_flow :: WithRedundancy Word32
   }
 
 flow_sensors :: FlowSensors
@@ -139,21 +139,22 @@ accumulator x = sum `div` constant 8
   sum =        stream + drop 1 stream + drop 2 stream + drop 3 stream
       + drop 4 stream + drop 5 stream + drop 6 stream + drop 7 stream
 -}
-accumulator :: Stream Int32 -> Stream Int32
+accumulator :: (Num a, Eq a, Integral a, Typed a) => Stream a -> Stream a
 accumulator x = sum `div` constant 4
   where
   stream = [0,0,0,0] ++ x
   sum = stream + drop 1 stream + drop 2 stream + drop 3 stream
+        --       + drop 4 stream + drop 5 stream + drop 6 stream + drop 7 stream
 
 -- | Accumulated (averaged) inhale flow sensors.
-inhale_accumulator :: Stream Int32
---inhale_accumulator = accumulator . principal . s_insp_flow . s_flow $ sensors
-inhale_accumulator = principal . s_insp_flow . s_flow $ sensors
+inhale_accumulator :: Stream Word32
+inhale_accumulator = accumulator . principal . s_insp_flow . s_flow $ sensors
+--inhale_accumulator = principal . s_insp_flow . s_flow $ sensors
 
 -- | Accumulated (averaged) exhale flow sensors.
-exhale_accumulator :: Stream Int32
---exhale_accumulator = accumulator . principal . s_exp_flow . s_flow $ sensors
-exhale_accumulator = principal . s_exp_flow . s_flow $ sensors
+exhale_accumulator :: Stream Word32
+exhale_accumulator = accumulator . principal . s_exp_flow . s_flow $ sensors
+--exhale_accumulator = principal . s_exp_flow . s_flow $ sensors
 
 -- | How to filter the insp pressure sensor?
 -- Let's try smoothing it by taking the average of the next and the last
@@ -164,38 +165,6 @@ insp_pressure_accumulator = accumulator sensor_data
   --stream = [0] ++ if low_switch then 0 else stream + sensor_data
   {-stream = integral 0 sensor_data-}
   sensor_data = principal . s_insp_pressure . s_pressure $ sensors
-{-
-insp_pressure_accumulator = stream
-
-  where
-
-  stream = [0] ++ next
-
-  next = (stream `div` 2) + (sensor_data `div` 2)
-
-  sensor_data = principal . s_insp_pressure . s_pressure $ sensors
--}
-
-{-
-insp_pressure_accumulator = maxi
-  where
-  sensor_data = principal . s_insp_pressure . s_pressure $ sensors
-
-  -- TODO bug: if we use 16 elements here, the c source blows up to 4M!!!
-  -- With 12, it's 364K. With 14 it's 1104K. With 10, it's 180K.
-  -- Yes indeed, each additional member doubles the source size!
-  -- MUST look into that...
-  stream = [0,0,0,0,0,0,0,0] ++ sensor_data
-  maxi :: Stream Int32
-  maxi = max stream
-       $ max (drop 1 stream)
-       $ max (drop 2 stream)
-       $ max (drop 3 stream)
-       $ max (drop 4 stream)
-       $ max (drop 5 stream)
-       $ max (drop 6 stream)
-       $     (drop 7 stream)
--}
 
 -- | True when an inhale has been detected: whenever `inhale_accumulator`
 -- is greater or equal to 8.
@@ -204,7 +173,7 @@ insp_pressure_accumulator = maxi
 inhale :: Stream Bool
 inhale = inhale_accumulator >= threshold
   where
-  threshold :: Stream Int32
+  threshold :: Stream Word32
   threshold = constant 8
 
 -- | True when an exhale has been detected: whenever `exhale_accumulator`
@@ -212,7 +181,7 @@ inhale = inhale_accumulator >= threshold
 exhale :: Stream Bool
 exhale = exhale_accumulator >= threshold
   where
-  threshold :: Stream Int32
+  threshold :: Stream Word32
   threshold = constant 8
 
 -- | The low switch for the motor must read True twice in a row in order
@@ -261,3 +230,22 @@ encoder_position_high = stream
 -- are triggered.
 encoder_position :: Stream Int32
 encoder_position = s_encoder_position (s_motor sensors)
+
+flow_insp :: Stream Word32
+flow_insp = principal . s_insp_flow . s_flow $ sensors
+
+flow_exp :: Stream Word32
+flow_exp = principal . s_exp_flow . s_flow $ sensors
+
+-- TODO FIXME probably won't remain accurate for long...
+-- Also it's not even right: must know the time unit and multiply using
+-- t_delta_us.
+volume :: Stream Int32
+volume = integral 0 (unsafeCast flow_insp - unsafeCast flow_exp)
+
+pressure :: Stream Int32
+pressure = principal . s_insp_pressure . s_pressure $ sensors
+
+-- | TODO infer from air in flow...
+oxygen :: Stream Word32
+oxygen = principal . s_air_in_flow . s_flow $ sensors
