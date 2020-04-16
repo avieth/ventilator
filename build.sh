@@ -16,18 +16,20 @@ BOSSAC=$duebuilder/bossac
 PORT=$port
 USB=$usb
 
-pwd
-ls
 
 set -o xtrace
+
+# to make ventilator.c and ventilator.h files
+$spec/bin/generate-c
 
 $COMPILE -I$src/encoder/ $src/encoder/Encoder.cpp -o Encoder.o
 $COMPILE -I$src/lcd/ $src/lcd/LiquidCrystal.cpp -o LiquidCrystal.o
 $COMPILE -I$src/lcd/ $src/display.cpp -o display.o
 $COMPILE -I$src/encoder $src/input.cpp -o input.o
 $COMPILE $src/display_modes.cpp -o display_modes.o
-$COMPILE $src/ventilator.c -o ventilator.o
-$COMPILE -I$src/encoder $src/main.cpp -o main.o
+# This one was generated
+$COMPILE ./ventilator.c -o ventilator.o
+$COMPILE -I./ -I$src/encoder $src/main.cpp -o main.o
 
 $LINK main.o display.o input.o display_modes.o ventilator.o \
   Encoder.o LiquidCrystal.o

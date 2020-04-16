@@ -55,7 +55,16 @@ void bpm_select(displayData *data, displayWriteData *dwd) {
   bpm_selected = *(dwd->bpm);
 }
 void bpm_change(int32_t x) {
-  bpm_selected += x;
+  if (x > 0) {
+    bpm_selected += 1;
+  } else if (x < 0) {
+    bpm_selected -= 1;
+  }
+  if (bpm_selected > 60) {
+    bpm_selected = 60;
+  } else if (bpm_selected < 6) {
+    bpm_selected = 6;
+  }
 }
 void bpm_overlay(void) {
   display_uint32(4, 2, 3, (uint32_t) bpm_selected);
@@ -157,7 +166,16 @@ void volume_select(displayData *data, displayWriteData *dwd) {
   volume_selected = *(dwd->volume);
 }
 void volume_change(int32_t x) {
-  volume_selected += 10 * x;
+  if (x > 0) {
+    volume_selected += 10;
+  } else if (x < 0) {
+    volume_selected -= 10;
+  }
+  if (volume_selected < 0) {
+    volume_selected = 0;
+  } else if (volume_selected > 5000) {
+    volume_selected = 5000;
+  }
 }
 void volume_overlay(void) {
   display_uint32(15, 0, 4, volume_selected);
@@ -189,7 +207,16 @@ void pressure_select(displayData *data, displayWriteData *dwd) {
   pressure_selected = *(dwd->pressure);
 }
 void pressure_change(int32_t x) {
-  pressure_selected += 100;
+  if (x > 0) {
+    pressure_selected += 100;
+  } else if (x < 0) {
+    pressure_selected -= 100;
+  }
+  if (pressure_selected > 40000) {
+    pressure_selected = 40000;
+  } else if (pressure_selected < 0) {
+    pressure_selected = 0;
+  }
 }
 void pressure_overlay(void) {
   display_uint32(15, 1, 4, pressure_selected / 98);
@@ -282,7 +309,11 @@ displayDataInput* get_display_data(uint8_t idx) {
  */
 displayDataInput* next_display_data(bool direction) {
   static uint8_t idx = 0;
-  idx = ((direction) ? (idx + 1) : (idx - 1)) % 7;
+  if (direction) {
+    idx = (idx + 1) % 7;
+  } else {
+    idx = (idx == 0) ? 6 : (idx - 1);
+  }
   return get_display_data(idx);
 }
 

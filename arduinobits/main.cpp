@@ -117,8 +117,6 @@ displayWriteData write_data = {
 #define BUTTON_DEBOUNCE 250000
 
 /**
- * TODO make this the "stop" button. Write the c_button_stop variable whenever
- * this routine is called and that's all.
  */
 void buttonLeft(bool pressed) {
   if (pressed) {
@@ -133,12 +131,17 @@ void buttonLeft(bool pressed) {
 };
 
 /**
- * TODO make this the "start" button. Write the c_button_start variable whenever
- * this routine is called and that's all.
  */
 void buttonRight(bool pressed) {
-  // Disable because it screws up the LCD when you press it (hardware
-  // trouble).
+  if (pressed) {
+    c_button_start = true;
+  } else {
+    c_button_start = false;
+  }
+  if (ui_editing) {
+    ui_focus->deselect(false, &write_data);
+    ui_editing = false;
+  }
 };
 
 

@@ -249,14 +249,12 @@ cmv_volume_goal_limited = Util.clamp lower upper (c_cmv_volume_goal controls)
   -- uL for 8mL/kg of a 200kg patient
   upper = constant 1600
 
--- | Limited to 8-20 cmH2O
+-- | Limited to 0-40 cmH2O
 --
 -- Does not use the global limited; those will be checked at all times and used
 -- to determine alarms.
 cmv_pressure_goal_limited :: Stream Word32
 cmv_pressure_goal_limited = Util.clamp lower upper (c_cmv_pressure_goal controls)
   where
-  -- ~ 8 cmH2O in Pa
-  lower = constant 784
-  -- ~ 20 cmH2O in Pa
-  upper = constant 1960
+  lower = constant 0
+  upper = constant 4000

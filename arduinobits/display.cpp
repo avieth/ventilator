@@ -101,6 +101,7 @@ void display_write(uint8_t col, uint8_t row, uint8_t c) {
  * hand side.
  */
 void display_uint32(uint8_t col, uint8_t row, uint8_t size, uint32_t n) {
+  display_clear(col, row, size);
   uint8_t c = col + (size - 1);
   uint32_t m = n;
   uint8_t digit;
