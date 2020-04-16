@@ -3,14 +3,15 @@
 module State where
 
 import Language.Copilot
-import Prelude hiding ((++), (&&), (||), (==), (/=), (<=), drop, not)
+import Prelude hiding ((++), (&&), (||), (==), (/=), (<=), (>), drop, not)
 
 import Controls
 import Sensors (encoder_position, encoder_position_low, low_switch, high_switch)
+import qualified Sensors (inhale_accumulator)
 import Motor (limit_motor_velocity)
 
 import Mode.Mandatory (cmv)
-import Mode.Spontaneous (simv)
+--import Mode.Spontaneous (simv)
 
 -- Due to the nature of copilot (streams must be defined _for all time_ and
 -- there is no way to define a finite-time stream fragment) it seems to me we're
@@ -107,9 +108,9 @@ motor_velocity =
   -- breath.
   then
     if Controls.mode == Controls.mCMV
-    then limit_motor_velocity (cmv is_running)
+    then limit_motor_velocity (cmv is_running (constant False))
     else if Controls.mode == Controls.mSIMV
-    then limit_motor_velocity (simv is_running)
+    then limit_motor_velocity (cmv is_running (Sensors.inhale_accumulator > constant 50))
     else constant 0
   else if state == constant sSTOPPED
   then 0

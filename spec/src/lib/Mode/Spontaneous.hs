@@ -2,6 +2,7 @@
 
 module Mode.Spontaneous where
 
+{-
 import Language.Copilot
 import Prelude hiding ((++), (&&), (>=), (<=), (>), (<), (==), div, drop, not)
 
@@ -77,3 +78,4 @@ subcycle is_running = stream
       then constant 1
       else constant 2
     else stream
+      -}

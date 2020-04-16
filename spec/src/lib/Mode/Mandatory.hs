@@ -28,8 +28,8 @@ import Motor (md_encoder_position)
 --
 -- When inhaling, it uses the current volume estimate and the volume goal
 -- in order to determine speed
-cmv :: Stream Bool -> Stream Int32
-cmv is_running = local (subcycle_time_remaining is_running) $ \t_remaining_us ->
+cmv :: Stream Bool -> Stream Bool -> Stream Int32
+cmv is_running spontaneous = local (subcycle_time_remaining is_running spontaneous) $ \t_remaining_us ->
   local Kin.volume_i $ \v_now ->
     -- > 0 means inhaling.
     if t_remaining_us > 0
@@ -72,8 +72,8 @@ type Subcycle = Bool
 -- 0 means neither inhaling nor exhaling...
 -- Problem: if either the inhale or exhale duration is 0, we would get stuck in
 -- a non-moving state. But that would be a problem case anyway...
-subcycle_time_remaining :: Stream Bool -> Stream Int32
-subcycle_time_remaining is_running = stream
+subcycle_time_remaining :: Stream Bool -> Stream Bool -> Stream Int32
+subcycle_time_remaining is_running spontaneous = stream
 
   where
 
@@ -95,14 +95,16 @@ subcycle_time_remaining is_running = stream
       then (if (stream >= (-(unsafeCast time_delta_us)))
       -- Go to inhale
       then unsafeCast inhale_duration_us
+      else if spontaneous && ((encoder_position - encoder_position_low) < 100)
+      then unsafeCast inhale_duration_us
       else stream + unsafeCast time_delta_us)
     else 0
 
 reset :: Stream Bool -> Stream Bool
 reset is_running = is_running && not ([False] ++ is_running)
 
-inhaling :: Stream Bool -> Stream Bool
-inhaling is_running = subcycle_time_remaining is_running > 0
+inhaling :: Stream Bool -> Stream Bool -> Stream Bool
+inhaling is_running spontaneous = subcycle_time_remaining is_running spontaneous > 0
 
-exhaling :: Stream Bool -> Stream Bool
-exhaling is_running = subcycle_time_remaining is_running < 0
+exhaling :: Stream Bool -> Stream Bool -> Stream Bool
+exhaling is_running spontaneous = subcycle_time_remaining is_running spontaneous < 0
