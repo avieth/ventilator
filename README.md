@@ -1,223 +1,141 @@
-# Code Life Ventilator Challenge
-
-## Description
-
-https://www.agorize.com/en/challenges/code-life-challenge/
-
-## Team
-
-- [Felix Desourdy](https://haply.co) ([Haply](https://haply.co)) - mechanical design 
-- [Alexander Vieth](https://www.linkedin.com/in/alexander-vieth-124a47ab/) - software engineering 
-- [Oliver Philbin-Briscoe]() - software engineering 
-- [Benjamin Delbos]() ([École de Technologie Supérieure](https://etsmtl.ca)) - robotics
-- [Christian Frisson](https://frisson.re)  ([McGill University](https://mcgill.ca)) - research and documentation
-- [George Fortin](https://haply.co) ([Haply](https://haply.co)) - logistics
-- [Steven Ding](https://haply.co) ([Haply](https://haply.co)) - electrical/embedded system design
-- [Colin Gallacher](https://haply.co) ([Haply](https://haply.co)) - robotics/control
-
-## Internal files
-
-### OS Ventilation Progress and FAQ
-
-https://docs.google.com/document/d/1Xkbfv5f3hvm_-Itjb2X9LNVDe4Kc9NQEOtHRD4e2AHU/edit
-
-### Google Drive Folder
-
-https://drive.google.com/drive/u/1/folders/1UyT5xOtw3AesYQrdalzUy_r4U2LgQmq_
-
-## Participation form
-
-This space allows you to create your Participation. Your submission will be evaluated based exclusively on the documents you provide in this space before proceeding to the next step
-
-https://www.agorize.com/en/challenges/code-life-challenge/teams/50819/participations
-
-### Call for ideas
-
-Use the form below to submit your design, ongoing project or proof of concept as soon as possible
-
-At the end of the step a jury of qualified professionals will examine all ideas and select the best ones. 
-
-Only vetted projects will access to the next phase.
-
-(Even after clicking on the SUBMIT button you can edit your idea and submit again before the deadline.)
-
-### Team name
-
-Haply OpenSource Ventilator
-
-### Image
-
-Choose an image to promote your idea
-
-https://cdn.fs.agorize.com/Bnd6BmsQNW99xLXaZhOJ/convert?crop_first=true&fit=crop&h=200&w=300
-
-![](images/Haply1-crop.png)
-
-([original](images/Haply1-orig.png))
-
-
-### Summary
-
-At Haply we specialize in mechatronic systems. Our company was founded building open-source tools for haptic training. We want to apply our expertise in mechatronics to this open-source ventilator. 
-
-### Categories
-
-- [x] Functional product (or near): Proven product or prototype vetted by valuable local entity
-- [x] Seed stage: Current idea is being processed but unverified or patented yet
-- [ ] Idea stage participation: Your idea is just a concept looking for professionals and industrial supports
-
-### Expertise section
-
-- [ ] [Expertise](Submission/Expertise/README.md)
-
-#### Proof of relevance for medical professional - Mandatory (visible for peer review)
-
-- [ ] [Medical](Submission/Expertise/Medical/README.md)
-Proof of relevance for medical professional with publicized credentials (proof of right to practice)
-
-One document, max. size 50 MB
-
-#### Proof of relevance for technical/engineering - Mandatory (visible for peer review)
-
-- [ ] [Technical](Submission/Expertise/Technical/README.md)
-Proof of relevance for technical/engineering professional with credentials to approve safety requirements
-
-One document, max. size 50 MB
-
-#### Resumes
-
-- [ ] [Resumes](Submission/Expertise/Resumes/README.md)
-Please add here the resumes of the members of your team and/or use the next question for LinkedIn links.
-
-One document, max. size 50 MB
-
-#### LinkedIn profile 1 (optional)
-
-https://www.linkedin.com/company/haplyrobotics
-
-#### LinkedIn profile 2 (optional)
-
-/
-
-#### Other LinkedIn profiles (optional)
-
-/
-
-### Communication
-
-- Main contact full Name: Colin Gallacher
-- Main contact email - Mandatory: colin@haply.co
-- Main contact phone number - Mandatory: (450) 900-1223
-- Secondary email: george@haply.co
-- Secondary phone number: (647) 871-5883
-
-### Capacity and costs
-
-Each team must have local capacity to produce, test, and demonstrate the performance of their design in accordance with the specifications. Costs of design and prototyping are to be covered by the contestants 
-
-#### We have local capacity to produce - Mandatory
-
-100% implies you are able to produce
-
-- [x] 100%
-- [ ] 75%
-- [ ] 50%
-- [ ] Less
-- [ ] Other
-
-### Materials
-
-Essential section to provide your documents. ⚠️ If your file is over the limit please provide a link to a accessible cloud drive, dropbox, wetransfer or related
-
-From [guidelines](https://www.agorize.com/en/challenges/code-life-challenge/pages/guidelines?lang=en): design, test, and use documents (please name files with concise descriptions).
-
-Documents, max. size 50 MB
-
-#### CAD drawings - Mandatory
-
-Please provide 2 options 
-
-- [ ] [CADDrawings](Submission/Materials/CADDrawings/README.md)
-3D files (.dwg, .stdprt, .sldasm, .ipt, .iam)
-
-#### Fully annotated 2D drawings
-
-(please name files with concise descriptions)
-
-- [ ] [2DDrawings](Submission/Materials/2DDrawings/README.md)
-Fully annotated 2D drawings (.pdf) 
-
-#### 3D mesh files (.stl)
-
-- [ ] [3DMesh Files](Submission/Materials/3DMeshFiles/README.md)
-(please name files with concise descriptions)
-(.stl)
-
-#### Fully annotated circuit diagrams
-
-- [ ] [Circuit Diagrams](Submission/Materials/CircuitDiagrams/README.md)
-Fully annotated circuit diagrams (.pdf)
-
-#### Functional block diagram - Mandatory
-
-- [ ] [Functional Block Diagram](Submission/Materials/FunctionalBlockDiagram/README.md)
-Functional block diagram (.pdf)
-
-#### Code: software/firmware. Include brief installation and user guide - Mandatory
-
-- [ ] [Installation User Guide](Submission/Materials/Code/InstallationUserGuide/README.md)
-brief installation and user guide (.pdf)
-- [ ] [Software Firmware](Submission/Materials/Code/SoftwareFirmware/README.md)
- and versioned code [here](Submission/Materials/Code/SoftwareFirmware/)
-
-#### Bill of materials
-
-- [ ] [Bills Of Materials](Submission/Materials/BillsOfMaterials/README.md)
-Bill of materials (.pdf)
-
-#### Clear and concise assembly instructions - Mandatory
-
-- [ ] [Assembly Instructions](Submission/Materials/AssemblyInstructions/README.md)
-Clear and concise assembly instructions (.pdf)
-
-#### Clear user guide - Mandatory
-
-- [ ] [How To Use Device](Submission/Materials/UserGuide/HowToUseDevice/README.md)
-Clear user guide (.pdf): How to use the device
-
-#### How to run a validation test and how often
-
-- [ ] [How To Run Validation Test](Submission/Materials/UserGuide/HowToRunValidationTest/README.md)
-How to run a validation test and how often (.pdf)
-
-#### How to maintain the device and clean the device, VIDEO demonstration of device (.mp4)
-
-- [ ] [How To Maintenance](Submission/Materials/HowToMaintenance/README.md)
-How to maintain the device and clean the device, video demonstration of device (.mp4)
-
-### Tests
-
-#### Test methods and test results
-
-- [ ] [Test Methods Results](Submission/Tests/TestMethodsResults/README.md)
-Test methods and test results (.pdf)
-
-### Endorsement
-
-#### Names of the professionals vetting your design: 
-
-Bernard Gallacher, Sarah Chan 
-
-#### Medical Endorsement
-
-- [ ] [Medical](Submission/Endorsement/Medical/README.md)
-ICU professional (ICU Physician or respiratory technician) (.pdf)
-
-#### Technical Endorsement
-
-- [ ] [Technical](Submission/Endorsement/Technical/README.md)
-Engineering professional attesting that safety (electrical, fire, etc.) have been met (.pdf)
-
-#### Not in the form, but in guidelines
-
-- [ ] Letter attesting to lack of conflict or identifying who on the contest panels is potentially at conflict of interest with a given submission
+# Software Manual and User Guide
+
+This section contains an overview of the software design, instructions to build
+and install it, and a brief operator's guide.
+
+## Quickstart
+
+The device ships with the software installed. The operator does not need to
+build or install anything. 
+
+At first startup from a powered-off state, the machine will self-calibrate by
+moving the piston to the extremeties. The LCD display will show CALIB in the
+status section (top-left) and will flash the green LED. The operator cannot
+interact with the device during this process.
+
+After calibration, the LCD will display READY in the status section. The
+operator may change mode (Mo), breaths-per-minute (Hz), inhale-to-exhale
+ratio (IE), and volume limit (mL). These are selected by moving the dial at
+the top right, and edited by pressing the circular button at the bottom left.
+The display will show square brackets around the field to be edited, and at
+this time, movements of the dial will change the value. A change is committed
+by pressing the circular button, and aborted by pressing either of the
+triangular buttons.
+
+To begin ventilation, press the right triangular button (which resembles a
+play button). The status will display RUNNING and the green LED will be solid.
+Parameters may be tuned while the machine is running.
+
+To stop ventilation, press the left triangular button. The red LED will be
+solid and an alarm will sound. This is to ensure that an operator must always
+take notice when the machine is not running. At this point, any patient in the
+circuit should be removed and, if necessary, given manual ventilation support.
+The machine can be reset by pressing either of the triangular buttons. This
+will bring the piston back to the start position and the machine will enter the
+READY state again.
+
+When the SIMV mode is selected, the machine will use the frequency,
+breaths-per-minute, and inhale-to-exhale ratios to determine a minimally
+acceptable breathing pattern. If the patient begins to inhale while the machine
+is not delivering a breath, it will begin to assist.
+
+## Build Instructions
+
+A fully-automatic and reproducible build is expressed using
+[nix](https://nixos.org/nix/). In the repository root directory, use
+`nix-build` to generate the binary along with a script to upload it to the
+microcontroller as follows:
+
+```sh
+$ nix-build default.nix --argstr port ttyACM0 --argstr usb false
+```
+
+where `ttyACM0` is replaced with the actual serial interface to use. Change
+`false` to `true` if using the microcontroller's native USB port rather than
+its programming port. When this command finishes, the directory `./result`
+will appear, containing the binary and an upload script:
+
+```sh
+$ ls ./result/
+build.bin
+upload
+$ ./result/upload
+```
+
+Running upload will stop the microcontroller, erasing its current program, and
+upload the new one (`build.bin`). The microcontroller will restarts when this
+process has completed. The machine may be powered on while this process is
+carried out.
+
+A precompiled binary is included in the root directory, called `rideau.bin`.
+This can be uploaded manually to the microcontroller using the
+[BOSSA](https://github.com/shumatech/BOSSA) tool, available for all common
+end-user computing platforms.
+
+## System Description
+
+The software system is factored into two components:
+
+- Low-level interfacing with sensors, switches, motor controls, human-input
+  devices, etc.
+- High-level definition of the ventilation system itself.
+
+The former is written in C, targeting the Arduino Mega, but in principle is
+appropriate for any board with similar or better capabilities in terms of I/O
+pins and microprocessor.
+
+The second is expressed in [Haskell](https://www.haskell.org/), by way of the
+[copilot](https://copilot-language.github.io/) suite of tools (BSD3 licensed).
+copilot was developed by Galois Inc. in partnership with NASA, to be applied in
+the runtime verification of unmanned aerial vehicle software[1]. A copilot
+specification is expressed in terms of pure functional streams of data--without
+destructive updates, pointers, or implicit type casts--and complies to C99
+suitable for execution in low-memory, real-time environments, without loops or
+dynamic memory allocation.
+
+In a software system where failure can lead to physical harm, high assurance is
+of utmost importance. The decision to use a domain-specific specification
+language, rather than a direct implementation in C, means it is easier to
+characterize, understand, and mitigate failure modes. As an added benefit, bug
+fixing, feature iteration, and general experimentation is much faster this way,
+due to the modularity and safety intrinsic to a pure functional language with
+a modern type system.
+
+The `./spec` directory contains the Haskell source files expressing the
+ventilator program abstract over hardware. The `./arduinobits/` directory
+contains the C source files expressing the interface between hardware and
+spec. At build time, the Haskell spec is used to generate the C source and
+header files `ventilator.h` and `ventilator.c`, which are used to compile and
+link the binary to be uploaded to the microcontroller.
+
+[1](https://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/20120001989.pdf)
+
+## Hazards and Limitations
+
+### Positive Characterization of Safe Operation
+
+Rather than attempting to imagine every possible failure mode of the controller
+software, it would be more prudent to characterize exactly what is the
+condition of non-failure, i.e. what must the controller observe in order to
+judge that it is safe to move air to or from the patient. Whenever this
+condition is not met, the controller must raise visual and audible alarms and
+must not move any air until an operator (a medical professional) has diagnosed
+and resolved the problem.
+
+### Fractional Arithmetic and Use of Floating Point
+
+Some software subsystems, notably kinematics and volume computation, pressure
+sensing, and flow sensing, are implemented using standard IEE754 floating point
+arithmetic. This is a safety hazard because errors may accumulate, leading to
+the controller delivering too little or too much air to the patient. It is
+essential that all such computations are meticulously audited to ensure that
+they fall within safe error bounds. Even if they were to be replaced with
+fixed point arithmetic, such an audit is required.
+
+Unsafe casts from floating points to integers are present in the software and
+are at the moment not checked for unacceptable loss of accuracy.
+
+## API Description for Software Developers
+
+There are [generated docs](./spec/docs/) for the high-level specification,
+to be viewed in any web browser.
