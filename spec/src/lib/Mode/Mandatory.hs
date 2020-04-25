@@ -58,9 +58,10 @@ cmv is_running spontaneous = local (subcycle_time_remaining is_running spontaneo
     -- don't actually reach 0 on exhale?
     then if t_remaining_us > (constant (-10))
         then 0
-      -- Multiply by 1000 to make it microdegrees (we divide by microseconds)
-      -- and by 2 to make the exhale phase go faster than it needs to.
-        else ((md_encoder_position encoder_position_low encoder_position) * 2000) `div` (-t_remaining_us)
+        -- Always retract at a rate that would get us back to 0 in time, at
+        -- the shortest exhale duration (60Hz, 1:1 ratio, meaning we have half
+        -- a second to traverse the roughly 90 degrees).
+        else -180
 
     else 0
 
