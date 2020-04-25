@@ -21,20 +21,19 @@ bool s_limit_high = false;
 uint8_t c_mode = 0; // CMV
 bool c_button_start = false;
 bool c_button_stop = false;
-uint8_t c_bpm = 12;
+uint8_t c_bpm = 16;
 uint8_t c_ie_inhale = 0x01;
 uint8_t c_ie_exhale = 0x02;
 bool c_cmv_mode = false; // CMV volume control
 uint32_t c_volume_limit = 1000;
-uint32_t c_pressure_limit = 5000;
+uint32_t c_pressure_limit = 4000;
 uint32_t c_cmv_volume_goal = 500; //mL
 uint32_t c_cmv_pressure_goal = 2000; //Pa
-uint32_t c_peep = 2;
+uint32_t c_peep = 0;
 
 /**
  * Globals for sensor data.
  * See update_sensors();
- * TODO must these use floating points really?
  * TODO units?
  */
 int32_t s_insp_pressure_1 = 0;
@@ -97,7 +96,7 @@ displayData display_data = {
   .ieExhale = c_ie_exhale,
   .tidalVolume = 0,
   .pressurePeak = 0,
-  .peep = 200,
+  .peep = 0,
   .oxygen = 100
 };
 
@@ -167,6 +166,54 @@ void buttonMain(bool pressed) {
     }
   }
 };
+
+/**
+ * Write a uint32_t big-endian to SerialUSB.
+ */
+void write_be(uint32_t x) {
+  uint8_t buf[4];
+  buf[3] =  x        & 0x000000FF;
+  buf[2] = (x >> 8)  & 0x000000FF;
+  buf[1] = (x >> 16) & 0x000000FF;
+  buf[0] = (x >> 24) & 0x000000FF;
+  SerialUSB.write(buf, 4);
+}
+
+/**
+ * Write out display data.
+ * 9 byte string header.
+ * 35 bytes data.
+ * Does nothing unless SerialUSB.availableForWrite is at least 44.
+ * That's because we wouldn't want this to block the rest of the program.
+ */
+void write_display_data(displayData *dd) {
+  /*
+  if (SerialUSB.availableForWrite() < 44) {
+    return;
+  }
+  SerialUSB.print("[DISPLAY]");
+  SerialUSB.write(dd->state);
+  SerialUSB.write(current_display_data_index());
+  // Is never in 0 for hidden/nonde.
+  SerialUSB.write((ui_editing) ? 0x02 : 0x01);
+  // 0 for CMV, 1 for SIMV.
+  SerialUSB.write(dd->mode);
+  // 1 byte for BPM.
+  SerialUSB.write(dd->bpm);
+  write_be(dd->tidalVolume);
+  write_be(dd->pressurePeak);
+  SerialUSB.write(dd->ieInhale);
+  SerialUSB.write(dd->ieExhale);
+  // FiO2 never changes
+  write_be(dd->oxygen);
+  // Pressure mean. We don't actually have this.
+  write_be(0);
+  // Peep never changes.
+  write_be(dd->peep);
+  write_be(s_insp_flow_1);
+  write_be(s_exp_flow_1);
+  */
+}
 
 /**
  * Limits how often ui_loop runs.
@@ -250,6 +297,12 @@ void ui_loop(uint32_t now_us) {
    * necessary.
    */
   display_format_running(&display_data);
+
+  /**
+   * Also, always write out data via USB so that an external display can use
+   * it. It begins with the magic string [DISPLAY] and consists of
+   */
+  write_display_data(&display_data);
 
   /**
    * For all states other than ready or running, the display is completely
@@ -417,7 +470,7 @@ void step_motor(uint32_t now_us) {
       accumulator_us = accumulator_us - pulse_us;
       unsigned long missed = accumulator_us / pulse_us;
       if (missed > 0) {
-        SerialUSB.print("motor underrun: missed ");
+        SerialUSB.print("[DEBUG] motor underrun: missed ");
         SerialUSB.print(missed);
         SerialUSB.println(" steps(s)");
         // The serial print takes a lot of time. In this case let's reset the
@@ -430,12 +483,27 @@ void step_motor(uint32_t now_us) {
   }
 }
 
+#define UPDATE_SENSORS_INTERVAL_US 100
+#define SENSOR_DEBUG_LIMIT_US 100000
+
 /**
- * To be called as often as, and immediately before, the sytsem logic is stepped
- * (by a call to step_system).
+ * Call this at every loop iteration.
+ * It will sample the sensors and write their values to the relevant globals,
+ * to be used by the system step(). Some of these sensors use stateful filters,
+ * so updating faster than the system step is not necessarily wasteful.
  */
-void update_sensors() {
-  s_encoder_position = encoder.read();
+void update_sensors(uint32_t in_now_us) {
+
+  static uint32_t last_us = 0;
+  if (in_now_us - last_us < UPDATE_SENSORS_INTERVAL_US) {
+    return;
+  }
+  last_us = in_now_us;
+
+  // We negate it so that the encoder will increase as the motor pushes air
+  // into the system (on inhale).
+  s_encoder_position = -encoder.read();
+  // "low" means fully retracted (end of exhale).
   s_limit_low  = digitalRead(PIN_LIMIT_SWITCH_LOWER) == LOW;
   s_limit_high = digitalRead(PIN_LIMIT_SWITCH_UPPER) == LOW;
 
@@ -443,20 +511,85 @@ void update_sensors() {
    *  Sample all of the sensors for this frame.
    *  No redundant sensor hardware at the moment so we just copy the values.
    */
-  s_insp_pressure_1 = lroundf(get_insp_pressure());
+  float insp_pressure = get_insp_pressure();
+  float insp_flow = get_insp_flow();
+  float exp_flow = get_exp_flow();
+  float air_in_flow = get_air_in_flow();
+  // FIXME currently we compute directly in cmH2O but the spec works in Pa.
+  // Want to have everything be Pa except for the user interface, which is
+  // cmH2O.
+  s_insp_pressure_1 = lroundf(insp_pressure * 98.0665);
   s_insp_pressure_2 = s_insp_pressure_2;
-  s_insp_flow_1 = lroundf(get_insp_flow());
+  s_insp_flow_1 = lroundf(insp_flow);
   s_insp_flow_2 = s_insp_flow_1;
-  s_exp_flow_1 = lroundf(get_exp_flow());
+  s_exp_flow_1 = lroundf(exp_flow);
   s_exp_flow_2 = s_exp_flow_1;
-  s_air_in_flow_1 = lroundf(get_air_in_flow());
+  s_air_in_flow_1 = lroundf(air_in_flow);
   s_air_in_flow_2 = s_air_in_flow_1;
-  //SerialUSB.print("Pa: ");
-  //SerialUSB.print(get_insp_pressure());
-  //SerialUSB.print(" Flow insp: ");
-  //SerialUSB.print(s_insp_flow_1);
-  //SerialUSB.print(" Flow exp: ");
-  //SerialUSB.println(s_exp_flow_1);
+
+  /*
+  // For sensor calib and debug purposes, update the filters every time this
+  // is called, but only print them 10 times a second.
+  uint16_t offset_if = sensor_offsets[INSPFLOW];
+  uint16_t offset_ef = sensor_offsets[EXPFLOW];
+  uint16_t offset_af = sensor_offsets[AIRINFLOW];
+  uint16_t raw_data_if = read_sensor_with_offset(INSPFLOW);
+  uint16_t raw_data_ef = read_sensor_with_offset(EXPFLOW);
+  uint16_t raw_data_af = read_sensor_with_offset(AIRINFLOW);
+  uint16_t filtered_if = get_update_filter(INSPFLOW, raw_data_if);
+  uint16_t filtered_ef = get_update_filter(EXPFLOW, raw_data_ef);
+  uint16_t filtered_af = get_update_filter(AIRINFLOW, raw_data_af);
+  float flow_raw_i = flow_rate(raw_data_if);
+  float flow_raw_e = flow_rate(raw_data_ef);
+  float flow_raw_a = flow_rate(raw_data_af);
+  float flow_filtered_i = flow_rate(filtered_if);
+  float flow_filtered_e = flow_rate(filtered_ef);
+  float flow_filtered_a = flow_rate(filtered_af);
+
+  // Only print 10 times a second
+  static uint32_t last_us = 0;
+  uint32_t now_us = micros();
+  if ((now_us - last_us) < SENSOR_DEBUG_LIMIT_US) {
+    return;
+  } else {
+    last_us = now_us;
+  }
+
+  SerialUSB.print(offset_if);
+  SerialUSB.print(" . ");
+  SerialUSB.print(raw_data_if);
+  SerialUSB.print(" . ");
+  SerialUSB.print(filtered_if);
+  SerialUSB.print(" . ");
+  SerialUSB.print(flow_raw_i);
+  SerialUSB.print(" . ");
+  SerialUSB.print(flow_filtered_i);
+
+  SerialUSB.print(" | ");
+  SerialUSB.print(offset_ef);
+  SerialUSB.print(" . ");
+  SerialUSB.print(raw_data_ef);
+  SerialUSB.print(" . ");
+  SerialUSB.print(filtered_ef);
+  SerialUSB.print(" . ");
+  SerialUSB.print(flow_raw_e);
+  SerialUSB.print(" . ");
+  SerialUSB.print(flow_filtered_e);
+
+  SerialUSB.print(" | ");
+  SerialUSB.print(offset_af);
+  SerialUSB.print(" . ");
+  SerialUSB.print(raw_data_af);
+  SerialUSB.print(" . ");
+  SerialUSB.print(filtered_af);
+  SerialUSB.print(" . ");
+  SerialUSB.print(flow_raw_a);
+  SerialUSB.print(" . ");
+  SerialUSB.print(flow_filtered_a);
+
+  SerialUSB.println();
+  */
+
 }
 
 /**
@@ -476,7 +609,6 @@ void step_system() {
   static unsigned long time_since_last_update_us = 0;
   time_since_last_update_us += t_delta_us;
   if (time_since_last_update_us >= STEP_SYSTEM_INTERVAL_US) {
-    update_sensors();
     unsigned long hold = t_delta_us;
     // Must set this because the system step() uses it.
     t_delta_us = time_since_last_update_us;
@@ -534,7 +666,7 @@ void update_ui(
   display_data.volumeLimit = in_cmv_volume_goal;
   display_data.pressurePeak = in_pressure;
   display_data.pressureLimit = in_cmv_pressure_goal;
-  display_data.peep = 200;
+  display_data.peep = 0;
   display_data.oxygen = 100;
 }
 
@@ -544,6 +676,7 @@ void update_ui(
 void loop() {
   uint32_t now_us = micros();
   update_time(now_us);
+  update_sensors(now_us);
   step_system();
   step_motor(now_us);
   input_poll(now_us);
