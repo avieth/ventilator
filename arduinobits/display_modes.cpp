@@ -193,7 +193,8 @@ displayDataInput ddiVolume = {
   .deselect = volume_deselect
 };
 
-// Pa
+// cmH2O for the interface
+// Writes out in Pa though, using a coarse conversion: multiply by 98.
 uint32_t pressure_selected = 0;
 void pressure_highlight(bool x) {
   if (x) {
@@ -204,26 +205,26 @@ void pressure_highlight(bool x) {
   }
 }
 void pressure_select(displayData *data, displayWriteData *dwd) {
-  pressure_selected = *(dwd->pressure);
+  pressure_selected = *(dwd->pressure) / 98;
 }
 void pressure_change(int32_t x) {
   if (x > 0) {
-    pressure_selected += 100;
+    pressure_selected += 1;
   } else if (x < 0) {
-    pressure_selected -= 100;
+    pressure_selected -= 1;
   }
-  if (pressure_selected > 40000) {
-    pressure_selected = 40000;
+  if (pressure_selected > 40) {
+    pressure_selected = 40;
   } else if (pressure_selected < 0) {
     pressure_selected = 0;
   }
 }
 void pressure_overlay(void) {
-  display_uint32(15, 1, 4, pressure_selected / 98);
+  display_uint32(15, 1, 4, pressure_selected);
 }
 void pressure_deselect(bool commit, displayWriteData *dwd) {
   if (commit) {
-    *(dwd->pressure) = pressure_selected;
+    *(dwd->pressure) = pressure_selected * 98;
   }
 }
 displayDataInput ddiPressure = {
@@ -369,7 +370,7 @@ void display_format_running(displayData *data) {
   // How to implement? Need to records in the data.
   display_string(9, 0, 6, "mL   :");
   display_uint32(15, 0, 4, (data->state == DISPLAY_STATE_RUNNING) ? data->tidalVolume : data->volumeLimit);
-  /* Pressure (peak) */
+  /* Pressure (peak), converted to cmH2O coarsely by division by 98. */
   display_string(9, 1, 6, "cmH2O:");
   display_uint32(15, 1, 4, ((data->state == DISPLAY_STATE_RUNNING) ? data->pressurePeak : data->pressureLimit) / 98);
   /* PEEP */
