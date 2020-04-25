@@ -22,6 +22,7 @@ set -o xtrace
 # to make ventilator.c and ventilator.h files
 $spec/bin/generate-c
 
+$COMPILE $src/median.c -o median.o
 $COMPILE -I$src/encoder/ $src/encoder/Encoder.cpp -o Encoder.o
 $COMPILE -I$src/lcd/ $src/lcd/LiquidCrystal.cpp -o LiquidCrystal.o
 $COMPILE -I$src/lcd/ $src/display.cpp -o display.o
@@ -31,7 +32,7 @@ $COMPILE $src/display_modes.cpp -o display_modes.o
 $COMPILE ./ventilator.c -o ventilator.o
 $COMPILE -I./ -I$src/encoder $src/main.cpp -o main.o
 
-$LINK main.o display.o input.o display_modes.o ventilator.o \
+$LINK main.o display.o input.o display_modes.o ventilator.o median.o \
   Encoder.o LiquidCrystal.o
 
 mkdir $out
