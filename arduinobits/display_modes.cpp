@@ -304,17 +304,29 @@ displayDataInput* get_display_data(uint8_t idx) {
 }
 
 /**
+ * Some external UI claims that it needs to know the index of the field being
+ * edited on screen on the device. Seems weird to me but oh well, I'm not
+ * asking questions about it. Anyway that's why we have this top-level
+ * index variable.
+ */
+uint8_t display_data_index = 0;
+
+/**
  * Get the next display data input. The bool indicates direction. An array of
  * the 7 display data inputs is traversed in a circular fashion.
  */
 displayDataInput* next_display_data(bool direction) {
   static uint8_t idx = 0;
   if (direction) {
-    idx = (idx + 1) % 7;
+    display_data_index = (display_data_index + 1) % 7;
   } else {
-    idx = (idx == 0) ? 6 : (idx - 1);
+    display_data_index = (display_data_index == 0) ? 6 : (display_data_index - 1);
   }
-  return get_display_data(idx);
+  return get_display_data(display_data_index);
+}
+
+uint8_t current_display_data_index(void) {
+  return display_data_index;
 }
 
 /**

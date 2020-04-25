@@ -53,4 +53,5 @@ typedef struct displayDataInput {
 
 displayDataInput* get_display_data(uint8_t index);
 displayDataInput* next_display_data(bool direction);
+uint8_t current_display_data_index(void);
 void display_format_running(displayData *data);
