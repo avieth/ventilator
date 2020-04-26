@@ -58,6 +58,11 @@ bellows_xsection_area_mm_2 = pi * r * r
 bellows_length_mm :: Double
 bellows_length_mm = 125.0
 
+-- | `bellows_length_mm * bellows_xsection_area_mm_2`
+-- Approximately 1021 millilitres.
+bellows_volume_mm_3 :: Double
+bellows_volume_mm_3 = 1021410.312
+
 -- | The distance in millimeters from the motor shaft to the piston when
 -- the piston is fully retracted
 start_position_mm :: Double
@@ -75,6 +80,8 @@ theta_max = theta_low
 -- | Min is when fully inhaled (cannot push any more air).
 theta_min :: Stream Double
 theta_min = theta_high
+
+-- TODO recompute theta bounds.
 
 -- | Precomputed highest angle (degrees).
 theta_low :: Stream Double
@@ -206,8 +213,11 @@ theta = theta_low - unsafeCast offset
   offset = md_encoder_position encoder_position encoder_position_low `div` 1000
 
 -- | Volume as an integer in millilitres.
-volume_i :: Stream Int32
-volume_i = unsafeCast (unsafeCast (volume_f / 1000.0) :: Stream Int64)
+--
+-- TODO get a volume approximation that doesn't ever use floating point, and
+-- we can eliminate these unsafe casts.
+volume_i :: Stream Word32
+volume_i = unsafeCast (unsafeCast (unsafeCast (volume_f / 1000.0) :: Stream Int64) :: Stream Int32)
 
 -- | Volume in cubic millimiters.
 volume_f :: Stream Double

@@ -36,13 +36,13 @@ cmv is_running spontaneous = local (subcycle_time_remaining is_running spontaneo
     then
       if Controls.cmv_mode == constant Controls.cmvVC
         -- Kin.volume_i is in millimeters, as is the CMV volume goal.
-        then if v_now >= (unsafeCast Controls.cmv_volume_goal_limited)
+        then if v_now >= Controls.cmv_volume_goal_limited
           then 0
           -- Must determine how fast we need to go in order to reach the goal.
           -- But that requires reverse kinematics: need to know the required
           -- angular delta. Reverse kinematics is expensive though.
           -- WHAT IF we compute that only at te beginning of the cycle?
-          else if (unsafeCast Controls.cmv_volume_goal_limited - v_now) > 1
+          else if (Controls.cmv_volume_goal_limited - v_now) > 1
           then 55
           else 0
       else if Controls.cmv_mode == constant Controls.cmvPC
@@ -61,7 +61,7 @@ cmv is_running spontaneous = local (subcycle_time_remaining is_running spontaneo
         -- Always retract at a rate that would get us back to 0 in time, at
         -- the shortest exhale duration (60Hz, 1:1 ratio, meaning we have half
         -- a second to traverse the roughly 90 degrees).
-        else -180
+        else -170
 
     else 0
 

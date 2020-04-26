@@ -115,9 +115,16 @@ spec = do
     -- We can do the flow integral using integral math, and maybe it'll be
     -- acceptable to check against the floating point "should be" kinematics
     -- computation.
-    , arg_named "volume_ml" $ (unsafeCast (unsafeCast (unsafeCast (volume_f / 1000.0) :: Stream Int64) :: Stream Int32) :: Stream Word32)
+    , arg_named "volume_ml" $ Kinematics.volume_i
     , arg_named "pressure"  $ Sensors.pressure
     , arg_named "oxygen"    $ Sensors.oxygen
+        -- TODO these are not the ideal choices, but they work well enough
+        -- for a demo.
+        (motor_velocity < 0)
+        --(let stream = [0, 0] ++ motor_velocity in stream >= 0 && drop 1 stream < 0)
+        (Kinematics.volume_i > 100)
+        Sensors.low_switch_on
+        Kinematics.volume_i
 
     , arg_named "bpm_limited"    $ bpm_limited
     , arg_named "ie_inhale"      $ ie_inhale_limited

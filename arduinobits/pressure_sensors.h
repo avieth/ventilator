@@ -60,7 +60,7 @@ uint32_t pressure_difference_i(uint16_t measurement) {
 }
 
 /**
- * Liters per minute.
+ * Liters per second.
  *
  * FIXME can we get a good approx of this with only integers?
  *
@@ -76,7 +76,7 @@ float flow_rate(uint16_t measurement) {
   // numerator guaranteed to be positive since pressure is.
   // m^3 / s
   float flow = AREA1 * sqrt(numerator/DENOMINATOR());
-  // Litres per minute
-  flow = flow * 60000.0;
+  // Litres per second
+  flow = flow * 1000.0;
   return flow;
 }

@@ -27,7 +27,7 @@ uint8_t c_ie_exhale = 0x02;
 bool c_cmv_mode = false; // CMV volume control
 uint32_t c_volume_limit = 1000;
 uint32_t c_pressure_limit = 4000;
-uint32_t c_cmv_volume_goal = 500; //mL
+uint32_t c_cmv_volume_goal = 800; //mL
 uint32_t c_cmv_pressure_goal = 2000; //Pa
 uint32_t c_peep = 0;
 
@@ -36,13 +36,13 @@ uint32_t c_peep = 0;
  * See update_sensors();
  * TODO units?
  */
-uint32_t s_insp_pressure_1 = 0;
+uint32_t s_insp_pressure_1 = 0; // Pa
 uint32_t s_insp_pressure_2 = 0;
-uint32_t s_insp_flow_1 = 0;
+uint32_t s_insp_flow_1 = 0; // uL/s
 uint32_t s_insp_flow_2 = 0;
-uint32_t s_exp_flow_1 = 0;
+uint32_t s_exp_flow_1 = 0; // uL/s
 uint32_t s_exp_flow_2 = 0;
-uint32_t s_air_in_flow_1 = 0;
+uint32_t s_air_in_flow_1 = 0; // uL/s
 uint32_t s_air_in_flow_2 = 0;
 
 /**
@@ -97,7 +97,7 @@ displayData display_data = {
   .tidalVolume = 0,
   .pressurePeak = 0,
   .peep = 0,
-  .oxygen = 100
+  .oxygen = 0
 };
 
 /**
@@ -548,8 +548,13 @@ void update_sensors(uint32_t in_now_us) {
   s_limit_high = digitalRead(PIN_LIMIT_SWITCH_UPPER) == LOW;
 
   /** 
-   *  Sample all of the sensors for this frame.
-   *  No redundant sensor hardware at the moment so we just copy the values.
+   * Sample all of the sensors for this frame.
+   * No redundant sensor hardware at the moment so we just copy the values.
+   *
+   * The flows give L/s, which of course is going to be mostly fractional.
+   * It's TODO compute these things without floats, but until then, we just
+   * multiply by 1e6 to get microlitres per second, which is actually useful
+   * as an integer.
    */
   float insp_pressure = get_insp_pressure();
   float insp_flow = get_insp_flow();
@@ -560,11 +565,11 @@ void update_sensors(uint32_t in_now_us) {
   // cmH2O.
   s_insp_pressure_1 = lroundf(insp_pressure * 98.0665);
   s_insp_pressure_2 = s_insp_pressure_2;
-  s_insp_flow_1 = lroundf(insp_flow);
+  s_insp_flow_1 = lroundf(insp_flow * 1000000.0);
   s_insp_flow_2 = s_insp_flow_1;
-  s_exp_flow_1 = lroundf(exp_flow);
+  s_exp_flow_1 = lroundf(exp_flow * 1000000.0);
   s_exp_flow_2 = s_exp_flow_1;
-  s_air_in_flow_1 = lroundf(air_in_flow);
+  s_air_in_flow_1 = lroundf(air_in_flow * 1000000.0);
   s_air_in_flow_2 = s_air_in_flow_1;
 
   /*
@@ -666,7 +671,13 @@ void debug(uint32_t inhale_time_us) {
   static uint32_t last_us = 0;
   uint32_t now_us = micros();
   if (now_us - last_us >= DEBUG_INTERVAL) {
-    //SerialUSB.println((float) inhale_time_us / 1000000.0);
+    /*
+    SerialUSB.print(s_insp_flow_1);
+    SerialUSB.print(" . ");
+    SerialUSB.print(s_air_in_flow_1);
+    SerialUSB.print(" . ");
+    SerialUSB.println((float) inhale_time_us / 1000000.0);
+    */
     last_us = now_us;
   }
 }
@@ -706,7 +717,8 @@ void update_ui(
   display_data.pressurePeak = in_pressure;
   display_data.pressureLimit = in_cmv_pressure_goal;
   display_data.peep = 0;
-  display_data.oxygen = 100;
+  // TODO hack for demo; fix properly.
+  display_data.oxygen = (in_oxygen > 100) ? 100 : in_oxygen;
 }
 
 /**

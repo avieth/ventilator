@@ -6,6 +6,8 @@ module Sensors
   , MotorSensors (..)
   , low_switch
   , high_switch
+  , low_switch_on
+  , high_switch_on
   , encoder_position
   , encoder_position_low
   , encoder_position_high
@@ -29,10 +31,11 @@ module Sensors
 
 import Language.Copilot hiding (max)
 import Redundancy
-import Util (max, integral)
+import Util (max, integral, controlled_integral)
 import Time (time_delta_us)
+import Controls (cmv_volume_goal_limited)
 
-import Prelude hiding ((++), (&&), (>=), div, drop, max)
+import Prelude hiding ((++), (&&), (||), (>=), (<), div, drop, max, not)
 
 -- | Organizational record for sensors relating to the piston and motor.
 data MotorSensors = MotorSensors
@@ -201,6 +204,26 @@ high_switch = sensor && drop 1 sensor
   sensor :: Stream Bool
   sensor = [False, False] ++ s_limit_high (s_motor sensors)
 
+{-
+-- | True when the low switch just changed to on.
+low_switch_on :: Stream Bool
+low_switch_on = not low_switch_ && drop 1 low_switch_
+  where
+  low_switch_ = [False, False] ++ low_switch
+-}
+
+low_switch_on :: Stream Bool
+low_switch_on = not below && drop 1 below
+  where
+  below :: Stream Bool
+  below = [False, False] ++ ((encoder_position - encoder_position_low) < 10)
+
+-- | True when the high switch just changed to on.
+high_switch_on :: Stream Bool
+high_switch_on = not high_switch_ && drop 1 high_switch_
+  where
+  high_switch_ = [False, False] ++ high_switch
+
 -- | The encoder position at the low switch. Updated whenever the low switch
 -- is hit.
 --
@@ -267,6 +290,106 @@ volume = constant 0 -- integral 0 (flow_insp - flow_exp)
 pressure :: Stream Word32
 pressure = principal . s_insp_pressure . s_pressure $ sensors
 
--- | TODO infer from air in flow...
-oxygen :: Stream Word32
-oxygen = principal . s_air_in_flow . s_flow $ sensors
+-- | The oxygen concentration is inferred by integrating air in flow through
+-- a pipe that presumably comes from a pure oxygen tank. Given that the volume
+-- of the bellows is known, we can compute from this the approximate
+-- percentage of oxygen in the bellows.
+--
+-- NB: this gives the ratio of pure oxygen to normal air, which of course also
+-- contains oxygen. It is _not_ really an estimation of oxygen concentration
+-- itself (but it a lower bound?)
+--
+-- This value is changed only when the bellows reaches the fully retracted
+-- point. The integral is taken over the retraction time, as this is when we
+-- expect to observe air in flow.
+-- What we need:
+-- - "Controlled" integral, with signals to indicate when it should be added
+--   to, held, or reset to 0.
+-- - Indication of change to the 0 state (resting at low)
+--
+-- Ah, more complicated than we thought: must know how far we actually
+-- retracted, not just the total volume.
+-- Worth pausing on that: suppose we bring in 100% O2 on the calibration
+-- retraction, then we push down half way and then pull in 50% O2. What's
+-- the concentration now? 75% right? The air left over on the first push was
+-- 100%, then we filled in the remaining air with 50% O2.
+--
+-- Ok, so we could show instead, as the FiO2 reading, how much oxygen was
+-- taken in on the last retraction, as a share of the total volume brought in?
+--
+-- So we also need
+-- - A signal giving the current modelled volume remaining in the bellows.
+--   We have that already, it's forward kinematics.
+--   `volume_delivered_mm_3`
+--   Divide by 1000 to get mL.
+-- - We must sample that at the "changed to retracting state"
+--
+oxygen
+  :: Stream Bool -- True when in retracting state.
+  -> Stream Bool -- True when just changed to retracting state
+  -> Stream Bool -- True when just changed to resting state
+  -> Stream Word32 -- Volume "missing" from the bellows (increases as air is pushed out) in mL.
+  -> Stream Word32
+oxygen in_retract_state changed_to_retract_state changed_to_rest_state bellows_volume_ml = stream
+
+  where
+
+  stream :: Stream Word32
+  stream = [0] ++ next
+  next :: Stream Word32
+  next =
+    if changed_to_rest_state
+    then (integrated_in_flow_ml) `div` volume_taken_in_ml
+    else stream
+
+  integrated_in_flow_ml :: Stream Word32
+  integrated_in_flow_ml = controlled_integral
+    -- When to reset to 0
+    changed_to_retract_state
+    -- When to add to the integral
+    in_retract_state
+    ((sensed_ul_s * time_delta_us) `div` 1000000)
+
+  -- The modelled volume missing from the bellows at the end of the inhale
+  -- phase.
+  volume_taken_in_ml :: Stream Word32
+  volume_taken_in_ml = cmv_volume_goal_limited
+ {- [0] ++
+    if changed_to_retract_state
+    then bellows_volume_ml
+    else volume_taken_in_ml -}
+
+  -- The sensed flow from the O2 source, in uL/s
+  sensed_ul_s :: Stream Word32
+  sensed_ul_s = principal . s_air_in_flow . s_flow $ sensors
+
+{-
+
+  stream :: Stream Word32
+  stream = [0] ++ next
+  next :: Stream Word32
+  next =
+    if changed_to_rest_state
+    then unsafeCast (unsafeCast (unsafeCast ((constant 100.0 * integrated_in_flow_ml) / unsafeCast volume_taken_in_ml) :: Stream Int64) :: Stream Int32)
+    else stream
+
+  integrated_in_flow_ml :: Stream Double
+  integrated_in_flow_ml = controlled_integral
+    -- When to reset to 0
+    changed_to_retract_state
+    -- When to add to the integral
+    in_retract_state
+    ((unsafeCast sensed_ul_s * unsafeCast time_delta_us) / 1000000.0)
+
+  -- The modelled volume missing from the bellows at the end of the inhale
+  -- phase.
+  volume_taken_in_ml :: Stream Word32
+  volume_taken_in_ml = constant 500 {- [1] ++
+    if changed_to_retract_state
+    then bellows_volume_ml
+    else volume_taken_in_ml -}
+
+  -- The sensed flow from the O2 source, in uL/s
+  sensed_ul_s :: Stream Word32
+  sensed_ul_s = principal . s_air_in_flow . s_flow $ sensors
+  -}

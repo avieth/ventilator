@@ -46,3 +46,20 @@ integral_ reset c x = sums
   where
   sums = [0] ++ next_sums
   next_sums = if reset then c else x + sums
+
+controlled_integral
+  :: (Num a, Eq a, Typed a)
+  => Stream Bool -- Reset to 0 when true
+  -> Stream Bool -- Add only when this is true
+  -> Stream a
+  -> Stream a
+controlled_integral reset active x = sums
+  where
+  sums = [0] ++ next_sums
+  next_sums =
+    if reset
+    then 0
+    else if active
+    then x + sums
+    else sums
+
