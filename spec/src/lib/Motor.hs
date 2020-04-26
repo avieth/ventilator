@@ -55,7 +55,7 @@ import Sensors
 -- Found that 3200 does not work; the motor can't be made to move even at 90
 -- degrees per second with this configuration. 1600 is fine though.
 steps_per_rotation :: Stream Word32
-steps_per_rotation = constant 3200
+steps_per_rotation = constant 1600
 
 -- | How many encoder pulses per revolution.
 pulses_per_rotation :: Stream Word32
