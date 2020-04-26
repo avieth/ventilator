@@ -110,7 +110,12 @@ spec = do
     -- velocity.
     , arg_named "flow_insp" $ Sensors.flow_insp
     , arg_named "flow_exp"  $ Sensors.flow_exp
-    , arg_named "volume_ml" $ (unsafeCast (unsafeCast (volume_f / 1000.0) :: Stream Int64) :: Stream Int32)
+    -- FIXME LOOOOL this is terrible
+    -- Do not use floating points for this ideally.
+    -- We can do the flow integral using integral math, and maybe it'll be
+    -- acceptable to check against the floating point "should be" kinematics
+    -- computation.
+    , arg_named "volume_ml" $ (unsafeCast (unsafeCast (unsafeCast (volume_f / 1000.0) :: Stream Int64) :: Stream Int32) :: Stream Word32)
     , arg_named "pressure"  $ Sensors.pressure
     , arg_named "oxygen"    $ Sensors.oxygen
 
@@ -130,6 +135,8 @@ spec = do
   -- with no arguments.
   -- TODO should have an alarm code.
   trigger "raise_alarm" alarm []
+
+  trigger "debug" true [arg_named "inhale_time_us" Sensors.inhale_time_us]
 
 -- | Write out the spec to C in @ventilator.h@ and @ventilator.c@
 gen_c :: IO ()

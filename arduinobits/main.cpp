@@ -36,8 +36,8 @@ uint32_t c_peep = 0;
  * See update_sensors();
  * TODO units?
  */
-int32_t s_insp_pressure_1 = 0;
-int32_t s_insp_pressure_2 = 0;
+uint32_t s_insp_pressure_1 = 0;
+uint32_t s_insp_pressure_2 = 0;
 uint32_t s_insp_flow_1 = 0;
 uint32_t s_insp_flow_2 = 0;
 uint32_t s_exp_flow_1 = 0;
@@ -167,52 +167,91 @@ void buttonMain(bool pressed) {
   }
 };
 
+uint8_t usb_buffer[43] = { 0x00 };
+
+uint8_t write_header(uint8_t index) {
+  usb_buffer[0] = '[';
+  usb_buffer[1] = 'H';
+  usb_buffer[2] = 'E';
+  usb_buffer[3] = 'A';
+  usb_buffer[4] = 'D';
+  usb_buffer[5] = 'E';
+  usb_buffer[6] = 'R';
+  usb_buffer[7] = ']';
+  return index+8;
+}
+
 /**
- * Write a uint32_t big-endian to SerialUSB.
+ * Write a uint32_t little-endian to usb_buffer.
  */
-void write_be(uint32_t x) {
-  uint8_t buf[4];
-  buf[3] =  x        & 0x000000FF;
-  buf[2] = (x >> 8)  & 0x000000FF;
-  buf[1] = (x >> 16) & 0x000000FF;
-  buf[0] = (x >> 24) & 0x000000FF;
-  SerialUSB.write(buf, 4);
+uint8_t write_le(uint32_t x, uint8_t index) {
+  usb_buffer[index++] =  x        & 0x000000FF;
+  usb_buffer[index++] = (x >> 8)  & 0x000000FF;
+  usb_buffer[index++] = (x >> 16) & 0x000000FF;
+  usb_buffer[index++] = (x >> 24) & 0x000000FF;
+  return index;
+}
+
+#define USB_DISPLAY_WRITE_LIMIT 16666
+
+/**
+ * Call this as often as possible. Writes out the usb_buffer at most 60 times
+ * per second.
+ */
+void flush_display_data(uint32_t now_us) {
+  static uint32_t last_us = 0;
+  if (now_us - last_us < USB_DISPLAY_WRITE_LIMIT) {
+    return;
+  }
+  last_us = now_us;
+  if (SerialUSB.availableForWrite() < 43) {
+    return;
+  }
+  SerialUSB.write(usb_buffer, 43);
 }
 
 /**
  * Write out display data.
- * 9 byte string header.
+ * 8 byte string header.
  * 35 bytes data.
- * Does nothing unless SerialUSB.availableForWrite is at least 44.
- * That's because we wouldn't want this to block the rest of the program.
+ * Does nothing unless SerialUSB.availableForWrite is at least 43.
+ * BUT FIXME the USB driver for this board actually does not give a useful
+ * value here, and blocks if there's nobody on the other end. We have a hacky
+ * workaround at the moment.
+ *
+ * And what's more, writing all this stuff out even at just 60Hz is prohibitvely
+ * slow (causes the motor to slow down a LOT).
+ * Ideas:
+ * 1. Write the entire buffer at once.
+ * 2. Stagger the writes.
+ * Each of these methods is analogous to the LCD display update: the former is
+ * the buffering we do here, the latter is the one-cell-at-a-time display.
  */
 void write_display_data(displayData *dd) {
-  /*
-  if (SerialUSB.availableForWrite() < 44) {
-    return;
-  }
-  SerialUSB.print("[DISPLAY]");
-  SerialUSB.write(dd->state);
-  SerialUSB.write(current_display_data_index());
-  // Is never in 0 for hidden/nonde.
-  SerialUSB.write((ui_editing) ? 0x02 : 0x01);
+  uint8_t index = 0;
+  index = write_header(index);
+  usb_buffer[index++] = dd->state;
+  usb_buffer[index++] = current_display_data_index();
+  // Is never in 0 for hidden/none.
+  usb_buffer[index++] = (ui_editing) ? 0x02 : 0x01;
   // 0 for CMV, 1 for SIMV.
-  SerialUSB.write(dd->mode);
+  usb_buffer[index++] = dd->mode;
   // 1 byte for BPM.
-  SerialUSB.write(dd->bpm);
-  write_be(dd->tidalVolume);
-  write_be(dd->pressurePeak);
-  SerialUSB.write(dd->ieInhale);
-  SerialUSB.write(dd->ieExhale);
+  usb_buffer[index++] = dd->bpm;
+  index = write_le(dd->tidalVolume, index);
+  index = write_le(dd->pressurePeak / 98, index);
+  usb_buffer[index++] = dd->ieInhale;
+  usb_buffer[index++] = dd->ieExhale;
   // FiO2 never changes
-  write_be(dd->oxygen);
+  index = write_le(dd->oxygen, index);
   // Pressure mean. We don't actually have this.
-  write_be(0);
+  index = write_le(0, index);
   // Peep never changes.
-  write_be(dd->peep);
-  write_be(s_insp_flow_1);
-  write_be(s_exp_flow_1);
-  */
+  index = write_le(dd->peep, index);
+  // TODO fix the UI so that insp flow shows as positive.
+  // For now we just flip insp and exp.
+  index = write_le(s_exp_flow_1, index);
+  index = write_le(s_insp_flow_1, index);
 }
 
 /**
@@ -295,12 +334,13 @@ void ui_loop(uint32_t now_us) {
   /**
    * We _always_ start by drawing the display data. We will overlay things if
    * necessary.
+   * NB: this is cheap.
    */
   display_format_running(&display_data);
 
   /**
-   * Also, always write out data via USB so that an external display can use
-   * it. It begins with the magic string [DISPLAY] and consists of
+   * Always update the display data for USB output too (this does not actually
+   * flush it though, we buffer it just like for the LCD data).
    */
   write_display_data(&display_data);
 
@@ -470,9 +510,9 @@ void step_motor(uint32_t now_us) {
       accumulator_us = accumulator_us - pulse_us;
       unsigned long missed = accumulator_us / pulse_us;
       if (missed > 0) {
-        SerialUSB.print("[DEBUG] motor underrun: missed ");
-        SerialUSB.print(missed);
-        SerialUSB.println(" steps(s)");
+        //SerialUSB.print("[DEBUG] motor underrun: missed ");
+        //SerialUSB.print(missed);
+        //SerialUSB.println(" steps(s)");
         // The serial print takes a lot of time. In this case let's reset the
         // last call time so that one underrun doesn't artifically cause further
         // underruns due to the serial print.
@@ -547,13 +587,15 @@ void update_sensors(uint32_t in_now_us) {
   float flow_filtered_a = flow_rate(filtered_af);
 
   // Only print 10 times a second
-  static uint32_t last_us = 0;
-  uint32_t now_us = micros();
-  if ((now_us - last_us) < SENSOR_DEBUG_LIMIT_US) {
+  static uint32_t last_debug_us = 0;
+  if ((in_now_us - last_debug_us) < SENSOR_DEBUG_LIMIT_US) {
     return;
   } else {
-    last_us = now_us;
+    last_debug_us = in_now_us;
   }
+
+  SerialUSB.print(insp_flow);
+  SerialUSB.print(" : ");
 
   SerialUSB.print(offset_if);
   SerialUSB.print(" . ");
@@ -620,17 +662,14 @@ void step_system() {
 
 #define DEBUG_INTERVAL 100000
 
-/*
-void debug(uint32_t now_us) {
-  static unsigned long debug_elapsed_us = 0;
-  debug_elapsed_us += t_delta_us;
-  if (debug_elapsed_us >= DEBUG_INTERVAL) {
-    SerialUSB.print(s_encoder_position);
-    SerialUSB.print(" : ");
-    SerialUSB.println(pulse_us);
-    debug_elapsed_us = 0;
+void debug(uint32_t inhale_time_us) {
+  static uint32_t last_us = 0;
+  uint32_t now_us = micros();
+  if (now_us - last_us >= DEBUG_INTERVAL) {
+    //SerialUSB.println((float) inhale_time_us / 1000000.0);
+    last_us = now_us;
   }
-}*/
+}
 
 /**
  * Values to be displayed are determined _solely_ by this function (its parameters).
@@ -648,8 +687,8 @@ void update_ui(
     uint8_t in_mode,
     uint32_t in_flow,
     uint32_t in_flow_exp,
-    int32_t in_volume,
-    int32_t in_pressure,
+    uint32_t in_volume,
+    uint32_t in_pressure,
     uint32_t in_oxygen,
     unsigned char in_bpm,
     unsigned char in_inhale_ratio,
@@ -682,5 +721,5 @@ void loop() {
   input_poll(now_us);
   ui_loop(now_us);
   display_draw(now_us);
-  //debug(now_us);
+  flush_display_data(now_us);
 }
