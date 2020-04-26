@@ -24,11 +24,13 @@ module Sensors
   , pressure
   , oxygen
   , volume
+  , inhale_time_us
   ) where
 
 import Language.Copilot hiding (max)
 import Redundancy
 import Util (max, integral)
+import Time (time_delta_us)
 
 import Prelude hiding ((++), (&&), (>=), div, drop, max)
 
@@ -72,7 +74,7 @@ oxygen_sensors = OxygenSensors
 --
 -- TODO units?
 data PressureSensors = PressureSensors
-  { s_insp_pressure :: WithRedundancy Int32
+  { s_insp_pressure :: WithRedundancy Word32
   }
 
 pressure_sensors :: PressureSensors
@@ -159,7 +161,7 @@ exhale_accumulator = accumulator . principal . s_exp_flow . s_flow $ sensors
 -- | How to filter the insp pressure sensor?
 -- Let's try smoothing it by taking the average of the next and the last
 -- signal.
-insp_pressure_accumulator :: Stream Int32
+insp_pressure_accumulator :: Stream Word32
 insp_pressure_accumulator = accumulator sensor_data
   where
   --stream = [0] ++ if low_switch then 0 else stream + sensor_data
@@ -234,16 +236,35 @@ encoder_position = s_encoder_position (s_motor sensors)
 flow_insp :: Stream Word32
 flow_insp = principal . s_insp_flow . s_flow $ sensors
 
+-- | If this is non-zero, it gives the time in microseconds over which we have
+-- observed continuous positive inspiratory flow. It goes back to 0 whenever
+-- the inspiratory flow is 0.
+-- TODO may want to require it to be 0 for a given amount of time?
+inhale_time_us :: Stream Word32
+inhale_time_us = stream
+
+  where
+
+  stream :: Stream Word32
+  stream = [0] ++ next
+
+  next :: Stream Word32
+  next = if flow_insp >= threshold then time_delta_us + stream else 0
+
+  -- Flow is in litres per minute. We choose 5 as a lower bound.
+  threshold :: Stream Word32
+  threshold = constant 5
+
 flow_exp :: Stream Word32
 flow_exp = principal . s_exp_flow . s_flow $ sensors
 
 -- TODO FIXME probably won't remain accurate for long...
 -- Also it's not even right: must know the time unit and multiply using
 -- t_delta_us.
-volume :: Stream Int32
-volume = integral 0 (unsafeCast flow_insp - unsafeCast flow_exp)
+volume :: Stream Word32
+volume = constant 0 -- integral 0 (flow_insp - flow_exp)
 
-pressure :: Stream Int32
+pressure :: Stream Word32
 pressure = principal . s_insp_pressure . s_pressure $ sensors
 
 -- | TODO infer from air in flow...

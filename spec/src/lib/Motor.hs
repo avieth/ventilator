@@ -119,8 +119,11 @@ pulse_data_from_velocity_dps x_dps = rate
 -- to set encoder offsets high and low), then this function may be used to
 -- give a limit on the velocity, so as to ensure the motor does not slam the
 -- piston against the endpoints.
-limit_motor_velocity :: Stream Int32 -> Stream Int32
-limit_motor_velocity dps = limited_dps
+--
+-- TODO better name. There are other things which will limit the motor
+-- velocity, they should be named based on why they limit / what they protect.
+limit_protect_endpoints :: Stream Int32 -> Stream Int32
+limit_protect_endpoints dps = limited_dps
   where
   -- Problem with this: can't use it until it's calibrated :)
   limited_dps :: Stream Int32
@@ -152,5 +155,3 @@ limit_motor_velocity dps = limited_dps
     else if low_delta < 1000
     then -10
     else dps
-
-

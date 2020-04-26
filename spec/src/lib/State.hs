@@ -3,12 +3,13 @@
 module State where
 
 import Language.Copilot
-import Prelude hiding ((++), (&&), (||), (==), (/=), (<=), (>), drop, not)
+import Prelude hiding ((++), (&&), (||), (==), (/=), (>=), (<=), (>), (<), drop,
+  not)
 
 import Controls
 import Sensors (encoder_position, encoder_position_low, low_switch, high_switch)
-import qualified Sensors (inhale_accumulator)
-import Motor (limit_motor_velocity)
+import qualified Sensors
+import Motor (limit_protect_endpoints)
 
 import Mode.Mandatory (cmv)
 --import Mode.Spontaneous (simv)
@@ -108,9 +109,9 @@ motor_velocity =
   -- breath.
   then
     if Controls.mode == Controls.mCMV
-    then limit_motor_velocity (cmv is_running (constant False))
+    then limit_protect_control_limits (limit_protect_endpoints (cmv is_running (constant False)))
     else if Controls.mode == Controls.mSIMV
-    then limit_motor_velocity (cmv is_running (Sensors.inhale_accumulator > constant 50))
+    then limit_protect_control_limits (limit_protect_endpoints (cmv is_running (Sensors.inhale_accumulator > constant 10)))
     else constant 0
   else if state == constant sSTOPPED
   then 0
@@ -180,3 +181,25 @@ velocity_resetting = constant (-15)
 
 end_reset :: Stream Bool
 end_reset = low_switch
+
+-- | Given a motor velocity (dps) limit it according to volume and pressure
+-- limits. This never limits negative velocity.
+limit_protect_control_limits :: Stream Int32 -> Stream Int32
+limit_protect_control_limits dps = limited_dps
+  where
+
+  limited_dps :: Stream Int32
+  limited_dps =
+    if dps > 0
+    then positive_limit
+    else if dps < 0
+    then dps
+    else 0
+
+  positive_limit :: Stream Int32
+  positive_limit =
+    if Sensors.pressure >= cmv_pressure_goal_limited
+    then 0
+    else if Sensors.volume >= cmv_volume_goal_limited
+    then 0
+    else dps
