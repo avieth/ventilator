@@ -6,8 +6,8 @@ let
   duebuilderpath = fetchFromGitHub {
     owner = "avieth";
     repo = "arduino";
-    rev = "67f14ddb06da3ded0f312c9621d991f1389644e2";
-    sha256 = "194nh4vp7zlawynh9z0f1ndr0ycyj8ywy4fzrm2w1a2j6a0r9rli";
+    rev = "5bb1b5250c61e56dde62ad418eb40737974d6ebb";
+    sha256 = "12sai32d6fh6f7nbaf2a9v53fhxwm74y71hmaynykgi4k0sl5fg6";
   };
   duebuilder = import duebuilderpath {
     inherit nixpkgs;
