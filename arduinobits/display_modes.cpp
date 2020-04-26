@@ -62,8 +62,8 @@ void bpm_change(int32_t x) {
   }
   if (bpm_selected > 60) {
     bpm_selected = 60;
-  } else if (bpm_selected < 6) {
-    bpm_selected = 6;
+  } else if (bpm_selected < 1) {
+    bpm_selected = 1;
   }
 }
 void bpm_overlay(void) {
@@ -260,48 +260,22 @@ displayDataInput ddiPeep = {
   .deselect = peep_deselect
 };
 
-uint32_t oxygen_selected = 0;
-void oxygen_highlight(bool x) {
-  if (x) {
-    display_write(8, 3, '[');
-    display_write(19, 3, ']');
-  } else {
-    display_write(8, 3, '>');
-  }
-}
-void oxygen_select(displayData *data, displayWriteData *dwd) {
-}
-void oxygen_change(int32_t x) {
-}
-void oxygen_overlay(void) {
-}
-void oxygen_deselect(bool commit, displayWriteData *dwd) {
-}
-displayDataInput ddiOxygen = {
-  .highlight = oxygen_highlight,
-  .select = oxygen_select,
-  .change = oxygen_change,
-  .overlay = oxygen_overlay,
-  .deselect = oxygen_deselect
-};
-
 /**
  * Get the display data at a given undex, which will be taken modulo the
- * array lenght (7).
- *Order is key: must correspond to the display ordering or else it will
+ * array length (6).
+ * Order is key: must correspond to the display ordering or else it will
  * give a weird confusing UX.
  */
 displayDataInput* get_display_data(uint8_t idx) {
-  static displayDataInput* ddis[7] = {
+  static displayDataInput* ddis[6] = {
     &ddiMode,
     &ddiBpm,
     &ddiIE,
     &ddiVolume,
     &ddiPressure,
-    &ddiPeep,
-    &ddiOxygen
+    &ddiPeep
   };
-  return ddis[idx % 7];
+  return ddis[idx % 6];
 }
 
 /**
@@ -319,9 +293,9 @@ uint8_t display_data_index = 0;
 displayDataInput* next_display_data(bool direction) {
   static uint8_t idx = 0;
   if (direction) {
-    display_data_index = (display_data_index + 1) % 7;
+    display_data_index = (display_data_index + 1) % 6;
   } else {
-    display_data_index = (display_data_index == 0) ? 6 : (display_data_index - 1);
+    display_data_index = (display_data_index == 0) ? 5 : (display_data_index - 1);
   }
   return get_display_data(display_data_index);
 }
