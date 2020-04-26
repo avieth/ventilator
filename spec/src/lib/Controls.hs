@@ -125,11 +125,11 @@ button_stop_high_edge = a && not b
 error_controls :: Controls -> Stream Bool
 error_controls _ = constant False
 
--- | Limit the breaths per minute to [6,40]
+-- | Limit the breaths per minute to [1,60]
 --
 -- FIXME TODO determine whether these are sensible BPM limits.
 bpm_limited :: Stream Word8
-bpm_limited = if bpm <= 6 then 6 else if bpm >= 40 then 40 else bpm
+bpm_limited = if bpm <= 1 then 1 else if bpm >= 60 then 60 else bpm
   where
   bpm = c_bpm controls
 
