@@ -42,12 +42,12 @@ cmv is_running spontaneous = local (subcycle_time_remaining is_running spontaneo
           -- But that requires reverse kinematics: need to know the required
           -- angular delta. Reverse kinematics is expensive though.
           -- WHAT IF we compute that only at te beginning of the cycle?
-          else if (unsafeCast Controls.cmv_volume_goal_limited - v_now) > 100
+          else if (unsafeCast Controls.cmv_volume_goal_limited - v_now) > 1
           then 55
-          else 25
+          else 0
       else if Controls.cmv_mode == constant Controls.cmvPC
         -- TODO use observed pressure and pressure goal.
-        then 25
+        then 0
       else 0
     -- < 0 means exhaling.
     else if t_remaining_us < 0

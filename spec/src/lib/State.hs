@@ -163,7 +163,7 @@ calibration_direction :: Stream Bool
 calibration_direction = calibration_phase == 1 || calibration_phase == 3
 
 calibration_speed :: Stream Word32
-calibration_speed = if not calibrated then constant 30 else constant 0
+calibration_speed = if not calibrated then constant 45 else constant 0
 
 -- | READY
 
@@ -177,7 +177,7 @@ velocity_ready =
 -- | RESET
 
 velocity_resetting :: Stream Int32
-velocity_resetting = constant (-15)
+velocity_resetting = constant (-45)
 
 end_reset :: Stream Bool
 end_reset = low_switch
