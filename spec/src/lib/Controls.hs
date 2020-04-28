@@ -147,7 +147,7 @@ global_max_flow :: Stream Word32
 global_max_flow = constant 1500
 
 global_pressure_max :: Stream Word32
-global_pressure_max = constant 5000
+global_pressure_max = constant 100000
 
 -- TODO are we dealing with absolute or relative pressure? If relative we'll
 -- need a signed integer.
@@ -257,4 +257,4 @@ cmv_pressure_goal_limited :: Stream Word32
 cmv_pressure_goal_limited = Util.clamp lower upper (c_cmv_pressure_goal controls)
   where
   lower = constant 0
-  upper = constant 4000
+  upper = constant 100000

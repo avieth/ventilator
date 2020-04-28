@@ -213,8 +213,8 @@ void pressure_change(int32_t x) {
   } else if (x < 0) {
     pressure_selected -= 1;
   }
-  if (pressure_selected > 40) {
-    pressure_selected = 40;
+  if (pressure_selected > 100) {
+    pressure_selected = 100;
   } else if (pressure_selected < 0) {
     pressure_selected = 0;
   }
@@ -324,7 +324,7 @@ void display_format_running(displayData *data) {
     display_string(0, 0, 7, "ERROR  ");
   }
   /* Mode */
-  display_string(1, 1, 3, "Mo:");
+  display_string(1, 1, 3, "MO:");
   if (data->mode == 0) {
     display_string(4, 1, 4, "CMV ");
   } else if (data->mode == 1) {
@@ -333,7 +333,7 @@ void display_format_running(displayData *data) {
     display_string(4, 1, 4, "????");
   }
   /* BPM */
-  display_string(1, 2, 3, "Hz:");
+  display_string(1, 2, 3, "BM:");
   display_uint32(4, 2, 3, (uint32_t) data->bpm);
   /* IE ratio */
   display_string(1, 3, 3, "IE:");

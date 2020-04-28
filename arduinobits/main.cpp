@@ -21,14 +21,14 @@ bool s_limit_high = false;
 uint8_t c_mode = 0; // CMV
 bool c_button_start = false;
 bool c_button_stop = false;
-uint8_t c_bpm = 16;
+uint8_t c_bpm = 12;
 uint8_t c_ie_inhale = 0x01;
 uint8_t c_ie_exhale = 0x02;
 bool c_cmv_mode = false; // CMV volume control
 uint32_t c_volume_limit = 1000;
-uint32_t c_pressure_limit = 4000;
-uint32_t c_cmv_volume_goal = 800; //mL
-uint32_t c_cmv_pressure_goal = 2000; //Pa
+uint32_t c_pressure_limit = 10000;
+uint32_t c_cmv_volume_goal = 600; //mL
+uint32_t c_cmv_pressure_goal = 4000; //Pa
 uint32_t c_peep = 0;
 
 /**
@@ -244,14 +244,15 @@ void write_display_data(displayData *dd) {
   usb_buffer[index++] = dd->ieExhale;
   // FiO2 never changes
   index = write_le(dd->oxygen, index);
-  // Pressure mean. We don't actually have this.
-  index = write_le(0, index);
-  // Peep never changes.
-  index = write_le(dd->peep, index);
+  // For the plot. We're doing this wrong TODO but it's just for the demo.
+  index = write_le(dd->pressurePeak / 98, index);
+  // TODO currently using this for the volume plot.
+  // Should be PEEP
+  index = write_le(dd->tidalVolume, index);
   // TODO fix the UI so that insp flow shows as positive.
   // For now we just flip insp and exp.
-  index = write_le(s_exp_flow_1, index);
-  index = write_le(s_insp_flow_1, index);
+  index = write_le(lroundf(get_exp_flow() * 60.0), index);
+  index = write_le(lroundf(get_insp_flow() * 60.0), index);
 }
 
 /**

@@ -111,7 +111,7 @@ motor_velocity =
     if Controls.mode == Controls.mCMV
     then limit_protect_control_limits (limit_protect_endpoints (cmv is_running (constant False)))
     else if Controls.mode == Controls.mSIMV
-    then limit_protect_control_limits (limit_protect_endpoints (cmv is_running (Sensors.inhale_accumulator > constant 10)))
+    then limit_protect_control_limits (limit_protect_endpoints (cmv is_running (Sensors.inhale_accumulator > constant 200000)))
     else constant 0
   else if state == constant sSTOPPED
   then 0
