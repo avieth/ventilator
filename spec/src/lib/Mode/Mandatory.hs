@@ -28,8 +28,8 @@ import Motor (md_encoder_position)
 --
 -- When inhaling, it uses the current volume estimate and the volume goal
 -- in order to determine speed
-cmv :: Stream Bool -> Stream Bool -> Stream Int32
-cmv is_running spontaneous = local (subcycle_time_remaining is_running spontaneous) $ \t_remaining_us ->
+cmv :: Stream Bool -> Stream Bool -> Stream Bool -> Stream Int32
+cmv is_running spontaneous_in spontaneous_ex = local (subcycle_time_remaining is_running spontaneous_in spontaneous_ex) $ \t_remaining_us ->
   local Kin.volume_i $ \v_now ->
     -- > 0 means inhaling.
     if t_remaining_us > 0
@@ -73,8 +73,12 @@ type Subcycle = Bool
 -- 0 means neither inhaling nor exhaling...
 -- Problem: if either the inhale or exhale duration is 0, we would get stuck in
 -- a non-moving state. But that would be a problem case anyway...
-subcycle_time_remaining :: Stream Bool -> Stream Bool -> Stream Int32
-subcycle_time_remaining is_running spontaneous = stream
+subcycle_time_remaining
+  :: Stream Bool
+  -> Stream Bool
+  -> Stream Bool
+  -> Stream Int32
+subcycle_time_remaining is_running spontaneous_in spontaneous_ex = stream
 
   where
 
@@ -87,16 +91,24 @@ subcycle_time_remaining is_running spontaneous = stream
     then stream
     else if reset is_running
     then unsafeCast inhale_duration_us
+    -- If we're inhaling ...
     else if (stream > 0)
       then (if (stream <= unsafeCast time_delta_us)
-      -- Go to exhale
+      -- ... and the duration has ended, go to exhale ...
+      then -(unsafeCast exhale_duration_us)
+      -- ... or if there is sufficient expiratory flow, go to exhale, but only
+      -- if the piston is not too near 0.
+      else if spontaneous_ex && ((encoder_position - encoder_position_low) > 20)
       then -(unsafeCast exhale_duration_us)
       else stream - unsafeCast time_delta_us)
+    -- If we're exhaling ...
     else if (stream < 0)
       then (if (stream >= (-(unsafeCast time_delta_us)))
-      -- Go to inhale
+      -- ... and the duration has ended, go to inhale ...
       then unsafeCast inhale_duration_us
-      else if spontaneous && ((encoder_position - encoder_position_low) < 100)
+      -- ... or if there's a spontaneous inhale, go to inhale, but only if the
+      -- piston is near 0.
+      else if spontaneous_in && ((encoder_position - encoder_position_low) < 20)
       then unsafeCast inhale_duration_us
       else stream + unsafeCast time_delta_us)
     else 0
@@ -104,8 +116,8 @@ subcycle_time_remaining is_running spontaneous = stream
 reset :: Stream Bool -> Stream Bool
 reset is_running = is_running && not ([False] ++ is_running)
 
-inhaling :: Stream Bool -> Stream Bool -> Stream Bool
-inhaling is_running spontaneous = subcycle_time_remaining is_running spontaneous > 0
+inhaling :: Stream Bool -> Stream Bool -> Stream Bool -> Stream Bool
+inhaling is_running spontaneous_in spontaneous_ex = subcycle_time_remaining is_running spontaneous_in spontaneous_ex > 0
 
-exhaling :: Stream Bool -> Stream Bool -> Stream Bool
-exhaling is_running spontaneous = subcycle_time_remaining is_running spontaneous < 0
+exhaling :: Stream Bool -> Stream Bool -> Stream Bool -> Stream Bool
+exhaling is_running spontaneous_in spontaneous_ex = subcycle_time_remaining is_running spontaneous_in spontaneous_ex < 0

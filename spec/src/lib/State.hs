@@ -109,9 +109,9 @@ motor_velocity =
   -- breath.
   then
     if Controls.mode == Controls.mCMV
-    then limit_protect_control_limits (limit_protect_endpoints (cmv is_running (constant False)))
+    then limit_protect_control_limits (limit_protect_endpoints (cmv is_running (constant False) (constant False)))
     else if Controls.mode == Controls.mSIMV
-    then limit_protect_control_limits (limit_protect_endpoints (cmv is_running (Sensors.inhale_accumulator > constant 200000)))
+    then limit_protect_control_limits (limit_protect_endpoints (cmv is_running (Sensors.inhale_accumulator > constant 200000) (Sensors.exhale_accumulator > constant 200000)))
     else constant 0
   else if state == constant sSTOPPED
   then 0
