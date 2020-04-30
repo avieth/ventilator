@@ -21,7 +21,7 @@ import qualified Controls
 import Cycle
 import Time
 import qualified Kinematics as Kin
-import Sensors (encoder_position, encoder_position_low)
+import Sensors (encoder_position, encoder_position_low, pressure)
 import Motor (md_encoder_position)
 
 -- | Gives the motor velocity (degrees per second) in CMV mode.
@@ -31,22 +31,20 @@ import Motor (md_encoder_position)
 cmv :: Stream Bool -> Stream Bool -> Stream Bool -> Stream Int32
 cmv is_running spontaneous_in spontaneous_ex = local (subcycle_time_remaining is_running spontaneous_in spontaneous_ex) $ \t_remaining_us ->
   local Kin.volume_i $ \v_now ->
+  local (time_since_goal_reached_us is_running spontaneous_in spontaneous_ex) $ \t_goal_reached ->
     -- > 0 means inhaling.
     if t_remaining_us > 0
     then
       if Controls.cmv_mode == constant Controls.cmvVC
-        -- Kin.volume_i is in millimeters, as is the CMV volume goal.
-        then if v_now >= Controls.cmv_volume_goal_limited
-          then 0
-          -- Must determine how fast we need to go in order to reach the goal.
-          -- But that requires reverse kinematics: need to know the required
-          -- angular delta. Reverse kinematics is expensive though.
-          -- WHAT IF we compute that only at te beginning of the cycle?
-          else if (Controls.cmv_volume_goal_limited - v_now) > 1
-          then 55
-          else 0
+        then if t_goal_reached > 0 && t_goal_reached < 200000
+        -- Pull back a bit once we reach the goal.
+        then -15
+        else if t_goal_reached >= 200000
+        then 0
+        else 55
       else if Controls.cmv_mode == constant Controls.cmvPC
         -- TODO use observed pressure and pressure goal.
+        -- This is not actually settable at the moment so no big deal.
         then 0
       else 0
     -- < 0 means exhaling.
@@ -63,6 +61,32 @@ cmv is_running spontaneous_in spontaneous_ex = local (subcycle_time_remaining is
         -- a second to traverse the roughly 90 degrees).
         else -170
 
+    else 0
+
+-- | The time elapsed in microseconds since the pressure or volume goal was
+-- reached during this inhale cycle, or 0 if it was not yet reached.
+time_since_goal_reached_us
+  :: Stream Bool
+  -> Stream Bool
+  -> Stream Bool
+  -> Stream Word32
+time_since_goal_reached_us is_running spontaneous_in spontaneous_ex = stream
+  where
+  stream = [0] ++ next
+  next =
+    if subcycle_time_remaining is_running spontaneous_in spontaneous_ex < 0
+    -- This means exhale phase
+    then 0
+    -- Must reset state so that, for instance, volume or pressure goals reached
+    -- during calibration mode don't infect state in running mode.
+    else if reset is_running
+    then 0
+    else if (stream == 0) && (Kin.volume_i >= Controls.cmv_volume_goal_limited)
+    then time_delta_us
+    else if (stream == 0) && (Sensors.pressure >= Controls.cmv_pressure_goal_limited)
+    then time_delta_us
+    else if (stream > 0)
+    then stream + time_delta_us
     else 0
 
 -- | The subcycle of CMV: true means inhaling, false means exhaling.
