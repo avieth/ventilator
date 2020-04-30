@@ -46,6 +46,19 @@ uint32_t s_air_in_flow_1 = 0; // uL/s
 uint32_t s_air_in_flow_2 = 0;
 
 /**
+ * Time difference in microseconds, with overflow handling.
+ * If the now time is less than the last time, then we assume it has
+ * overflowed (will happen after about 70 hours).
+ */
+uint32_t diff_time_us(uint32_t last_us, uint32_t now_us) {
+  if (now_us >= last_us) {
+    return now_us - last_us;
+  } else {
+    return (0xFFFFFFFF - last_us) + now_us;
+  }
+}
+
+/**
  * The time leapsed (in microseconds) since the last loop() call.
  * It is set by update_time(), which is the first thing to be called in loop().
  * It is also read by the system logic in step().
@@ -57,7 +70,7 @@ uint32_t t_delta_us = 0;
  */
 void update_time(uint32_t now_us) {
   static long last_us = 0;
-  t_delta_us = now_us - last_us;
+  t_delta_us = diff_time_us(last_us, now_us);
   last_us = now_us;
 }
 
@@ -151,7 +164,7 @@ void buttonMain(bool pressed) {
   static uint32_t last_us = 0;
   uint32_t now_us = micros();
 
-  if ((now_us - last_us) < BUTTON_DEBOUNCE) {
+  if (diff_time_us(last_us, now_us) < BUTTON_DEBOUNCE) {
     return;
   } else {
     last_us = now_us;
@@ -200,7 +213,7 @@ uint8_t write_le(uint32_t x, uint8_t index) {
  */
 void flush_display_data(uint32_t now_us) {
   static uint32_t last_us = 0;
-  if (now_us - last_us < USB_DISPLAY_WRITE_LIMIT) {
+  if (diff_time_us(last_us, now_us) < USB_DISPLAY_WRITE_LIMIT) {
     return;
   }
   last_us = now_us;
@@ -282,7 +295,7 @@ void ui_loop(uint32_t now_us) {
   static uint32_t accumulator_us = 0;
   static uint32_t accumulator_encoder_us = 0;
   static uint32_t last_us = 0;
-  uint32_t delta_us = now_us - last_us;
+  uint32_t delta_us = diff_time_us(last_us, now_us);
   accumulator_us += delta_us;
   accumulator_encoder_us += delta_us;
   last_us = now_us;
@@ -479,7 +492,7 @@ void step_motor(uint32_t now_us) {
    */
   static unsigned long last_call_us = 0;
 
-  unsigned long delta_us = now_us - last_call_us;
+  unsigned long delta_us = diff_time_us(last_call_us, now_us);
   last_call_us = now_us;
 
   /**
@@ -536,7 +549,7 @@ void step_motor(uint32_t now_us) {
 void update_sensors(uint32_t in_now_us) {
 
   static uint32_t last_us = 0;
-  if (in_now_us - last_us < UPDATE_SENSORS_INTERVAL_US) {
+  if (diff_time_us(last_us, in_now_us) < UPDATE_SENSORS_INTERVAL_US) {
     return;
   }
   last_us = in_now_us;
@@ -671,7 +684,7 @@ void step_system() {
 void debug(uint32_t inhale_time_us) {
   static uint32_t last_us = 0;
   uint32_t now_us = micros();
-  if (now_us - last_us >= DEBUG_INTERVAL) {
+  if (diff_time_us(last_us, now_us) >= DEBUG_INTERVAL) {
     /*
     SerialUSB.print(s_insp_flow_1);
     SerialUSB.print(" . ");
