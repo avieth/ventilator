@@ -180,7 +180,7 @@ void buttonMain(bool pressed) {
   }
 };
 
-uint8_t usb_buffer[43] = { 0x00 };
+uint8_t usb_buffer[47] = { 0x00 };
 
 uint8_t write_header(uint8_t index) {
   usb_buffer[0] = '[';
@@ -217,17 +217,18 @@ void flush_display_data(uint32_t now_us) {
     return;
   }
   last_us = now_us;
-  if (SerialUSB.availableForWrite() < 43) {
+  if (SerialUSB.availableForWrite() < 47) {
     return;
   }
-  SerialUSB.write(usb_buffer, 43);
+  SerialUSB.write(usb_buffer, 47);
 }
 
 /**
  * Write out display data.
  * 8 byte string header.
- * 35 bytes data.
- * Does nothing unless SerialUSB.availableForWrite is at least 43.
+ * 39 bytes data.
+ * Does nothing unless SerialUSB.availableForWrite is at least 47
+ *
  * BUT FIXME the USB driver for this board actually does not give a useful
  * value here, and blocks if there's nobody on the other end. We have a hacky
  * workaround at the moment.
@@ -274,6 +275,7 @@ void write_display_data(displayData *dd) {
   // L/s directly or would we lose accuracy?
   index = write_le(lroundf(get_exp_flow() * 60.0), index);
   index = write_le(lroundf(get_insp_flow() * 60.0), index);
+  index = write_le(lroundf(get_air_in_flow() * 60.0), index);
 }
 
 /**
