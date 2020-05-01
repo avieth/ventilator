@@ -28,6 +28,15 @@ module Controls
   , cmv_volume_goal_limited
   , cmv_pressure_goal_limited
 
+  , insp_threshold
+  , exp_threshold
+  , air_in_threshold
+  , pressure_threshold
+
+  , steps_per_revolution
+
+  , inhale_speed_dps
+
   -- TODO move these to a different module, they are not controls.
   , global_max_flow
   , global_volume_min
@@ -83,6 +92,15 @@ data Controls = Controls
   , c_cmv_volume_goal    :: Stream Word32
     -- | Pa
   , c_cmv_pressure_goal  :: Stream Word32
+
+  , c_insp_threshold     :: Stream Word32
+  , c_exp_threshold      :: Stream Word32
+  , c_air_in_threshold   :: Stream Word32
+  , c_pressure_threshold :: Stream Word32
+
+  , c_steps_per_revolution :: Stream Word32
+
+  , c_inhale_speed_dps :: Stream Word32
   }
 
 -- | All controls are external (not derived).
@@ -100,6 +118,12 @@ controls = Controls
   , c_cmv_mode          = extern "c_cmv_mode"          Nothing
   , c_cmv_volume_goal   = extern "c_cmv_volume_goal"   Nothing
   , c_cmv_pressure_goal = extern "c_cmv_pressure_goal" Nothing
+  , c_insp_threshold     = extern "c_insp_threshold"     Nothing
+  , c_exp_threshold      = extern "c_exp_threshold"      Nothing
+  , c_air_in_threshold   = extern "c_air_in_threshold"   Nothing
+  , c_pressure_threshold = extern "c_pressure_threshold" Nothing
+  , c_steps_per_revolution = extern "c_steps_per_revolution" Nothing
+  , c_inhale_speed_dps = extern "c_inhale_speed_dps" Nothing
   }
 
 -- | True whenever the start button becomes pressed (changed, high leading
@@ -258,3 +282,21 @@ cmv_pressure_goal_limited = Util.clamp lower upper (c_cmv_pressure_goal controls
   where
   lower = constant 0
   upper = constant 100000
+
+insp_threshold :: Stream Word32
+insp_threshold = c_insp_threshold controls
+
+exp_threshold :: Stream Word32
+exp_threshold = c_exp_threshold controls
+
+air_in_threshold :: Stream Word32
+air_in_threshold = c_air_in_threshold controls
+
+pressure_threshold :: Stream Word32
+pressure_threshold = c_pressure_threshold controls
+
+steps_per_revolution :: Stream Word32
+steps_per_revolution = c_steps_per_revolution controls
+
+inhale_speed_dps :: Stream Word32
+inhale_speed_dps = c_inhale_speed_dps controls

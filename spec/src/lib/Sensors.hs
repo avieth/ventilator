@@ -33,7 +33,7 @@ import Language.Copilot hiding (max)
 import Redundancy
 import Util (max, integral, controlled_integral)
 import Time (time_delta_us)
-import Controls (cmv_volume_goal_limited)
+import Controls (cmv_volume_goal_limited, air_in_threshold)
 
 import Prelude hiding ((++), (&&), (||), (>=), (<), div, drop, max, not)
 
@@ -361,7 +361,8 @@ oxygen in_retract_state changed_to_retract_state changed_to_rest_state bellows_v
 
   -- The sensed flow from the O2 source, in uL/s
   sensed_ul_s :: Stream Word32
-  sensed_ul_s = principal . s_air_in_flow . s_flow $ sensors
+  sensed_ul_s = local (principal . s_air_in_flow . s_flow $ sensors) $ \inflow ->
+    if inflow < air_in_threshold then 0 else inflow
 
 {-
 

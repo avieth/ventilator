@@ -11,6 +11,7 @@ import Prelude hiding ((++), (<), (>), (<=), (>=), (&&), (/=), (==), div, drop, 
   min, max)
 
 import Sensors
+import Controls (steps_per_revolution)
 
 -- TODO must reset the position on the high switch as well as the low switch.
 -- At low we already do this: set it to 0. But what to set at high? We don't
@@ -55,7 +56,7 @@ import Sensors
 -- Found that 3200 does not work; the motor can't be made to move even at 90
 -- degrees per second with this configuration. 1600 is fine though.
 steps_per_rotation :: Stream Word32
-steps_per_rotation = constant 1600
+steps_per_rotation = steps_per_revolution
 
 -- | How many encoder pulses per revolution.
 pulses_per_rotation :: Stream Word32

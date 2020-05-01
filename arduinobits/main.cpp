@@ -31,6 +31,15 @@ uint32_t c_cmv_volume_goal = 600; //mL
 uint32_t c_cmv_pressure_goal = 4000; //Pa
 uint32_t c_peep = 0;
 
+uint32_t c_insp_threshold = 200000;
+uint32_t c_exp_threshold = 200000;
+uint32_t c_air_in_threshold = 200000;
+uint32_t c_pressure_threshold = 100;
+
+/* Must be consistent with stepper motor hardware */
+uint32_t c_steps_per_revolution = 1600;
+uint32_t c_inhale_speed_dps = 180;
+
 /**
  * Globals for sensor data.
  * See update_sensors();
@@ -179,6 +188,102 @@ void buttonMain(bool pressed) {
     }
   }
 };
+
+#define USB_READ_LIMIT 16666
+
+/**
+ * Non-blocking read from serial USB to control certain values which are
+ * used by the ventilator logic.
+ *
+ * Call as often as possible. It will limit reads to 60Hz.
+ */
+void read_usb_input(uint32_t now_us) {
+  // How many bytes read since the last newline was seen.
+  static uint32_t bytes_read = 0;
+  // Determined by the first byte read. Determines which thing to change.
+  static int16_t instruction = 0;
+  // Determined by bytes read after the instruction byte and up to a newline.
+  static uint32_t value = 0;
+  // Set to true if a legit instruction is given. Remains true if all values
+  // between it and the newline are ASCII digits.
+  // At newline, update will happen only if valid is true.
+  static bool valid = false;
+  static uint32_t last_us = 0;
+  if (diff_time_us(last_us, now_us) < USB_READ_LIMIT) {
+    return;
+  }
+  last_us = now_us;
+  if (SerialUSB.available() <= 0) {
+    return;
+  }
+  // Won't block (unless there is a bug in the docs or the firmware).
+  int16_t byte = SerialUSB.read();
+  // TODO for debugging. remove.
+  display_data.peep++;
+  if (byte == '\n') {
+    // Commit valid values and then reset the state.
+    if (valid) {
+      if (instruction == 'i') {
+        c_insp_threshold = value;
+      } else if (instruction == 'e') {
+        c_exp_threshold = value;
+      } else if (instruction == 'a') {
+        c_air_in_threshold = value;
+      } else if (instruction == 'p') {
+        c_pressure_threshold = value;
+      } else if (instruction == 'm') {
+        c_steps_per_revolution = value;
+      } else if (instruction == 's') {
+        c_inhale_speed_dps = value;
+      }
+    }
+    valid = false;
+    value = 0;
+    instruction = 0;
+    bytes_read = 0;
+  } else if (bytes_read == 0) {
+    // At index 0 we await an instruction character
+    bytes_read++;
+    instruction = byte;
+    valid =
+         (instruction == 'i')
+      || (instruction == 'e')
+      || (instruction == 'a')
+      || (instruction == 'p')
+      || (instruction == 'm')
+      || (instruction == 's');
+  } else if (bytes_read > 0) {
+    bytes_read++;
+    // Check that its a decimal number (ASCII 48 to 57).
+    if (byte >= 48 && byte < 58) {
+      uint32_t n = ((uint32_t) byte) - 48;
+      value = (value * 10) + n;
+    } else {
+      // Let's say if we get something that's not recognized, put in what we
+      // have so far.
+      if (valid) {
+        if (instruction == 'i') {
+          c_insp_threshold = value;
+        } else if (instruction == 'e') {
+          c_exp_threshold = value;
+        } else if (instruction == 'a') {
+          c_air_in_threshold = value;
+        } else if (instruction == 'p') {
+          c_pressure_threshold = value;
+        } else if (instruction == 'm') {
+          c_steps_per_revolution = value;
+        } else if (instruction == 's') {
+          c_inhale_speed_dps = value;
+        }
+      }
+      valid = false;
+      value = 0;
+      instruction = 0;
+      bytes_read = 0;
+      //valid = false;
+    }
+  }
+}
 
 uint8_t usb_buffer[47] = { 0x00 };
 
@@ -740,7 +845,6 @@ void update_ui(
   display_data.volumeLimit = in_cmv_volume_goal;
   display_data.pressurePeak = in_pressure;
   display_data.pressureLimit = in_cmv_pressure_goal;
-  display_data.peep = 0;
   // TODO hack for demo; fix properly.
   display_data.oxygen = (in_oxygen > 100) ? 100 : in_oxygen;
 }
@@ -758,4 +862,5 @@ void loop() {
   ui_loop(now_us);
   display_draw(now_us);
   flush_display_data(now_us);
+  read_usb_input(now_us);
 }

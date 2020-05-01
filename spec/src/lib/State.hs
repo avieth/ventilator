@@ -116,8 +116,8 @@ motor_velocity =
     else if Controls.mode == Controls.mSIMV
     then limit_protect_control_limits $ limit_protect_endpoints $ cmv
       is_running
-      (Sensors.inhale_accumulator > constant 200000)
-      (Sensors.exhale_accumulator > constant 200000 || Sensors.inhale_accumulator == 0)
+      (Sensors.inhale_accumulator > insp_threshold)
+      (Sensors.exhale_accumulator > exp_threshold || Sensors.inhale_accumulator == 0)
     else constant 0
   else if state == constant sSTOPPED
   then 0
@@ -206,8 +206,8 @@ limit_protect_control_limits dps = limited_dps
   positive_limit =
     if Sensors.pressure >= cmv_pressure_goal_limited
     then 0
-    else if Sensors.pressure >= (cmv_pressure_goal_limited - 100)
-    then 10
+    else if Sensors.pressure >= (cmv_pressure_goal_limited - pressure_threshold)
+    then 5
     else if Sensors.volume >= cmv_volume_goal_limited
     then 0
     else dps

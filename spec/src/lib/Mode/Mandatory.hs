@@ -42,8 +42,17 @@ cmv is_running spontaneous_in spontaneous_ex = local (subcycle_time_remaining is
         else if t_goal_reached >= 200000
               -- Then pull back all the way, even if the cycle doesn't say we should
                -- exhale yet.
-        then 0 -- then -170
-        else 60
+        then -170
+        else unsafeCast Controls.inhale_speed_dps
+        
+        -- Here we use a coarse estimate. It takes roughly 90 degrees to
+        -- move 1000mL, so f := 1000/90 ~ 11
+        -- We want a dps x such that
+        --   x * (t_remaining_us / 1e6) * f = v
+        -- where v is the remaining volume that we must move
+        -- So, x = (1e6 * v) / (f * t_remaining_us)
+        -- It's not exact but may be good enough.
+        --else (constant 1000000 * unsafeCast (Controls.cmv_volume_goal_limited - v_now)) `div` (constant 11 * t_remaining_us)
       else if Controls.cmv_mode == constant Controls.cmvPC
         -- TODO use observed pressure and pressure goal.
         -- This is not actually settable at the moment so no big deal.
