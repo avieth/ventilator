@@ -251,19 +251,27 @@ void write_display_data(displayData *dd) {
   usb_buffer[index++] = dd->mode;
   // 1 byte for BPM.
   usb_buffer[index++] = dd->bpm;
-  index = write_le(dd->tidalVolume, index);
-  index = write_le(dd->pressurePeak / 98, index);
+  // Volume limit _control_, not current value
+  index = write_le(dd->volumeLimit, index);
+  // Prssure limit _control_, not current pressure value. Divided by 98 to
+  // be approximately cmH2O
+  index = write_le(dd->pressureLimit / 98, index);
+  // Inhale/exhale ratio.
   usb_buffer[index++] = dd->ieInhale;
   usb_buffer[index++] = dd->ieExhale;
-  // FiO2 never changes
+  // Oxygen concentration as a percentage.
+  // Could have been just a byte but oh well.
   index = write_le(dd->oxygen, index);
-  // For the plot. We're doing this wrong TODO but it's just for the demo.
+  // Current pressure value (for the plot), divided by 98 to be approximately
+  // cmH2O.
   index = write_le(dd->pressurePeak / 98, index);
-  // TODO currently using this for the volume plot.
-  // Should be PEEP
+  // Current volume value (for the plot).
   index = write_le(dd->tidalVolume, index);
-  // TODO fix the UI so that insp flow shows as positive.
-  // For now we just flip insp and exp.
+  // Flow values (for the plot), multiplied by 60 to make L/m.
+  // TODO not ideal that we sample these here by calling the *_flow() functions,
+  // but it's done because the ones we already have, in s_insp_flow_1 and
+  // s_exp_flow_1, are rounded to mL/s. Would it be ok to convert those to
+  // L/s directly or would we lose accuracy?
   index = write_le(lroundf(get_exp_flow() * 60.0), index);
   index = write_le(lroundf(get_insp_flow() * 60.0), index);
 }

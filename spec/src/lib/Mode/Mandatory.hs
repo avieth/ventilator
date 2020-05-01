@@ -40,8 +40,10 @@ cmv is_running spontaneous_in spontaneous_ex = local (subcycle_time_remaining is
         -- Pull back a bit once we reach the goal.
         then -15
         else if t_goal_reached >= 200000
-        then 0
-        else 55
+              -- Then pull back all the way, even if the cycle doesn't say we should
+               -- exhale yet.
+        then 0 -- then -170
+        else 60
       else if Controls.cmv_mode == constant Controls.cmvPC
         -- TODO use observed pressure and pressure goal.
         -- This is not actually settable at the moment so no big deal.
