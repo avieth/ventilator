@@ -37,6 +37,9 @@ module Controls
 
   , inhale_speed_dps
 
+  , angle_at_zero
+  , position_at_zero
+
   -- TODO move these to a different module, they are not controls.
   , global_max_flow
   , global_volume_min
@@ -101,6 +104,9 @@ data Controls = Controls
   , c_steps_per_revolution :: Stream Word32
 
   , c_inhale_speed_dps :: Stream Word32
+
+  , c_angle_at_zero :: Stream Double
+  , c_position_at_zero :: Stream Double
   }
 
 -- | All controls are external (not derived).
@@ -124,6 +130,8 @@ controls = Controls
   , c_pressure_threshold = extern "c_pressure_threshold" Nothing
   , c_steps_per_revolution = extern "c_steps_per_revolution" Nothing
   , c_inhale_speed_dps = extern "c_inhale_speed_dps" Nothing
+  , c_angle_at_zero = extern "c_angle_at_zero" Nothing
+  , c_position_at_zero = extern "c_position_at_zero" Nothing
   }
 
 -- | True whenever the start button becomes pressed (changed, high leading
@@ -300,3 +308,9 @@ steps_per_revolution = c_steps_per_revolution controls
 
 inhale_speed_dps :: Stream Word32
 inhale_speed_dps = c_inhale_speed_dps controls
+
+angle_at_zero :: Stream Double
+angle_at_zero = c_angle_at_zero controls
+
+position_at_zero :: Stream Double
+position_at_zero = c_position_at_zero controls

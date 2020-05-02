@@ -133,6 +133,7 @@ spec = do
     , arg_named "cmv_mode"          $ cmv_mode
     , arg_named "cmv_volume_goal"   $ cmv_volume_goal_limited
     , arg_named "cmv_pressure_goal" $ cmv_pressure_goal_limited
+
     ]
 
   -- Whenever the `alarm` signal is true, call into the C function
@@ -143,7 +144,10 @@ spec = do
   -- TODO should have an alarm code.
   trigger "raise_alarm" alarm []
 
-  trigger "debug" true [arg_named "inhale_time_us" Sensors.inhale_time_us]
+  trigger "debug" true [
+      arg_named "angle" $ Kinematics.theta
+    , arg_named "position" $ Kinematics.forward_kinematics_mm Kinematics.theta
+    ]
 
 -- | Write out the spec to C in @ventilator.h@ and @ventilator.c@
 gen_c :: IO ()

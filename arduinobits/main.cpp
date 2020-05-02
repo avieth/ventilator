@@ -40,6 +40,9 @@ uint32_t c_pressure_threshold = 100;
 uint32_t c_steps_per_revolution = 1600;
 uint32_t c_inhale_speed_dps = 180;
 
+double c_angle_at_zero = 175.0;
+double c_position_at_zero = 37.9251;
+
 /**
  * Globals for sensor data.
  * See update_sensors();
@@ -218,8 +221,6 @@ void read_usb_input(uint32_t now_us) {
   }
   // Won't block (unless there is a bug in the docs or the firmware).
   int16_t byte = SerialUSB.read();
-  // TODO for debugging. remove.
-  display_data.peep++;
   if (byte == '\n') {
     // Commit valid values and then reset the state.
     if (valid) {
@@ -235,6 +236,10 @@ void read_usb_input(uint32_t now_us) {
         c_steps_per_revolution = value;
       } else if (instruction == 's') {
         c_inhale_speed_dps = value;
+      } else if (instruction == 'x') {
+        c_position_at_zero = (double) value;
+      } else if (instruction == 't') {
+        c_angle_at_zero = (double) value;
       }
     }
     valid = false;
@@ -251,7 +256,9 @@ void read_usb_input(uint32_t now_us) {
       || (instruction == 'a')
       || (instruction == 'p')
       || (instruction == 'm')
-      || (instruction == 's');
+      || (instruction == 's')
+      || (instruction == 'x')
+      || (instruction == 't');
   } else if (bytes_read > 0) {
     bytes_read++;
     // Check that its a decimal number (ASCII 48 to 57).
@@ -274,6 +281,10 @@ void read_usb_input(uint32_t now_us) {
           c_steps_per_revolution = value;
         } else if (instruction == 's') {
           c_inhale_speed_dps = value;
+        } else if (instruction == 'x') {
+          c_position_at_zero = (double) value;
+        } else if (instruction == 't') {
+          c_angle_at_zero = (double) value;
         }
       }
       valid = false;
@@ -796,10 +807,12 @@ void step_system() {
 
 #define DEBUG_INTERVAL 100000
 
-void debug(uint32_t inhale_time_us) {
+void debug(double in_angle, double in_pos) {
   static uint32_t last_us = 0;
   uint32_t now_us = micros();
   if (diff_time_us(last_us, now_us) >= DEBUG_INTERVAL) {
+    display_data.peep = lroundf(in_angle);
+    display_data.oxygen = lroundf(in_pos);
     /*
     SerialUSB.print(s_insp_flow_1);
     SerialUSB.print(" . ");
@@ -846,7 +859,7 @@ void update_ui(
   display_data.pressurePeak = in_pressure;
   display_data.pressureLimit = in_cmv_pressure_goal;
   // TODO hack for demo; fix properly.
-  display_data.oxygen = (in_oxygen > 100) ? 100 : in_oxygen;
+  //display_data.oxygen = (in_oxygen > 100) ? 100 : in_oxygen;
 }
 
 /**

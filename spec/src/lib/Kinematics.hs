@@ -23,6 +23,7 @@ module Kinematics
 
 import Language.Copilot
 
+import Controls
 import Motor
 import Sensors
 
@@ -65,8 +66,9 @@ bellows_volume_mm_3 = 1021410.312
 
 -- | The distance in millimeters from the motor shaft to the piston when
 -- the piston is fully retracted
-start_position_mm :: Double
-start_position_mm = 90.120
+start_position_mm :: Stream Double
+--start_position_mm = 37.9251 -- 90.120
+start_position_mm = Controls.position_at_zero
 
 -- min/max angles in the conventional ring-hand meaning: a lower angle means the
 -- piston is farther from the shaft.
@@ -85,7 +87,8 @@ theta_min = theta_high
 
 -- | Precomputed highest angle (degrees).
 theta_low :: Stream Double
-theta_low = constant 110.51730062094212
+--theta_low = constant 175.0 -- 110.51730062094212
+theta_low = Controls.angle_at_zero
 
 -- | Precomputed lowest angle (degrees).
 theta_high :: Stream Double
@@ -110,7 +113,7 @@ l_squared = constant 7225.0
 {- l_squared = l * l -}
 
 big_l_squared :: Stream Double
-big_l_squared = constant 14400.0
+big_l_squared = constant 19600.0
 {- big_l_squared = big_l * big_l -}
 
 -- | The volume delivered to the patient in cubic millimeters, given a
@@ -119,7 +122,7 @@ big_l_squared = constant 14400.0
 -- For example: this would be maximal at 0
 volume_delivered_mm_3 :: Stream Double -> Stream Double
 volume_delivered_mm_3 theta =
-  bellows_xsection_area_mm_2 * (forward_kinematics_mm theta - constant start_position_mm)
+  bellows_xsection_area_mm_2 * (forward_kinematics_mm theta - start_position_mm)
 
 -- acos approximation
 -- Stolen from stack overflow.
