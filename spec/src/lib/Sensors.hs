@@ -26,6 +26,7 @@ module Sensors
   , pressure
   , oxygen
   , volume
+  , volume_integral
   , inhale_time_us
   ) where
 
@@ -354,43 +355,43 @@ oxygen in_retract_state changed_to_retract_state changed_to_rest_state bellows_v
   -- phase.
   volume_taken_in_ml :: Stream Word32
   volume_taken_in_ml = cmv_volume_goal_limited
- {- [0] ++
-    if changed_to_retract_state
-    then bellows_volume_ml
-    else volume_taken_in_ml -}
 
   -- The sensed flow from the O2 source, in uL/s
   sensed_ul_s :: Stream Word32
   sensed_ul_s = local (principal . s_air_in_flow . s_flow $ sensors) $ \inflow ->
     if inflow < air_in_threshold then 0 else inflow
 
-{-
+-- | Integral of inspiratory flow, in microlitres, over the course of an
+-- inhale. Resets to 0 when the piston returns to origin.
+volume_integral
+  :: Stream Bool -- True when in pushing state.
+  -> Stream Bool -- True when just changed to resting state
+  -> Stream Word32
+volume_integral in_push_state changed_to_rest_state =
+  stream
+
+  where
 
   stream :: Stream Word32
   stream = [0] ++ next
   next :: Stream Word32
   next =
     if changed_to_rest_state
-    then unsafeCast (unsafeCast (unsafeCast ((constant 100.0 * integrated_in_flow_ml) / unsafeCast volume_taken_in_ml) :: Stream Int64) :: Stream Int32)
-    else stream
+    then 0
+    else integrated_insp_flow_ml
 
-  integrated_in_flow_ml :: Stream Double
-  integrated_in_flow_ml = controlled_integral
+  integrated_insp_flow_ml :: Stream Word32
+  integrated_insp_flow_ml = controlled_integral
     -- When to reset to 0
-    changed_to_retract_state
+    changed_to_rest_state
     -- When to add to the integral
-    in_retract_state
-    ((unsafeCast sensed_ul_s * unsafeCast time_delta_us) / 1000000.0)
+    in_push_state
+    ((sensed_ul_s * time_delta_us) `div` 1000000)
 
-  -- The modelled volume missing from the bellows at the end of the inhale
-  -- phase.
-  volume_taken_in_ml :: Stream Word32
-  volume_taken_in_ml = constant 500 {- [1] ++
-    if changed_to_retract_state
-    then bellows_volume_ml
-    else volume_taken_in_ml -}
-
-  -- The sensed flow from the O2 source, in uL/s
+  -- The sensed inspiratory flow in uL / s.
   sensed_ul_s :: Stream Word32
-  sensed_ul_s = principal . s_air_in_flow . s_flow $ sensors
-  -}
+  sensed_ul_s = principal . s_insp_flow . s_flow $ sensors
+  --sensed_ul_s = local (principal . s_insp_flow . s_flow $ sensors) $ \inflow ->
+  --  if inflow < air_in_threshold then 0 else inflow
+
+

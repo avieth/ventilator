@@ -841,6 +841,7 @@ void update_ui(
     uint32_t in_flow,
     uint32_t in_flow_exp,
     uint32_t in_volume,
+    uint32_t in_volume_integrated,
     uint32_t in_pressure,
     uint32_t in_oxygen,
     unsigned char in_bpm,
@@ -854,7 +855,8 @@ void update_ui(
   display_data.bpm = in_bpm;
   display_data.ieInhale = in_inhale_ratio;
   display_data.ieExhale = in_exhale_ratio;
-  display_data.tidalVolume = in_volume;
+  // Make it mL.
+  display_data.tidalVolume = in_volume_integrated / 1000;
   display_data.volumeLimit = in_cmv_volume_goal;
   display_data.pressurePeak = in_pressure;
   display_data.pressureLimit = in_cmv_pressure_goal;

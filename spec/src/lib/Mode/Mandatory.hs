@@ -21,7 +21,8 @@ import qualified Controls
 import Cycle
 import Time
 import qualified Kinematics as Kin
-import Sensors (encoder_position, encoder_position_low, pressure)
+import Sensors (encoder_position, encoder_position_low, low_switch_on,
+  pressure, volume_integral)
 import Motor (md_encoder_position)
 
 -- | Gives the motor velocity (degrees per second) in CMV mode.
@@ -30,7 +31,6 @@ import Motor (md_encoder_position)
 -- in order to determine speed
 cmv :: Stream Bool -> Stream Bool -> Stream Bool -> Stream Int32
 cmv is_running spontaneous_in spontaneous_ex = local (subcycle_time_remaining is_running spontaneous_in spontaneous_ex) $ \t_remaining_us ->
-  local Kin.volume_i $ \v_now ->
   local (time_since_goal_reached_us is_running spontaneous_in spontaneous_ex) $ \t_goal_reached ->
     -- > 0 means inhaling.
     if t_remaining_us > 0
@@ -92,7 +92,9 @@ time_since_goal_reached_us is_running spontaneous_in spontaneous_ex = stream
     -- during calibration mode don't infect state in running mode.
     else if reset is_running
     then 0
-    else if (stream == 0) && (Kin.volume_i >= Controls.cmv_volume_goal_limited)
+    --else if (stream == 0) && (Kin.volume_i >= Controls.cmv_volume_goal_limited)
+    --Goal is multiplied by 1000 because the integral is in microlitres
+    else if (stream == 0) && ((volume_integral (subcycle_time_remaining is_running spontaneous_in spontaneous_ex > 0) low_switch_on) >= (Controls.cmv_volume_goal_limited * constant 1000))
     then time_delta_us
     else if (stream == 0) && (Sensors.pressure >= Controls.cmv_pressure_goal_limited)
     then time_delta_us

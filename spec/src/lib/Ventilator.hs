@@ -116,6 +116,9 @@ spec = do
     -- acceptable to check against the floating point "should be" kinematics
     -- computation.
     , arg_named "volume_ml" $ Kinematics.volume_i
+    , arg_named "volume_ml_sensed" $ Sensors.volume_integral
+        (motor_velocity > 0)
+        Sensors.low_switch_on
     , arg_named "pressure"  $ Sensors.pressure
     , arg_named "oxygen"    $ Sensors.oxygen
         -- TODO these are not the ideal choices, but they work well enough
