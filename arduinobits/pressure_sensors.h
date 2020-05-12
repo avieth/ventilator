@@ -16,19 +16,20 @@ float flow_rate(uint16_t measurement);
 uint32_t pressure_difference_i(uint16_t measurement);
 
 /**
- * Reads a pin 10 times, takes the integral average plus 1, to give a baseline reading.
+ * Take the maximum of 500 readings, to give the sensors "offset" which is
+ * taken to be the baseline value for sensor readings. Anything less is
+ * considered to be 0, anything greater is the difference.
  */
 uint16_t sensor_offset(uint8_t analogPin){
-  // int is wide enough, since we're only summing 10 measurements in [0,1024)
-  // But oh well use 32 bits anyway.
-  uint32_t sum = 0;
+  uint32_t max = 0;
+  uint32_t reading = 0;
 
-  for(int i = 0; i < 60; i++){
-    sum = sum + (uint32_t) (analogRead(analogPin));
+  for(int i = 0; i < 500; i++){
+    reading = (uint32_t) (analogRead(analogPin));
+    max = (reading > max) ? reading : max;
   }
-  sum = sum / 60;
 
-  return sum;
+  return max;
 }
 
 /**
