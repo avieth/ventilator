@@ -38,7 +38,7 @@ uint32_t c_pressure_threshold = 100;
 
 /* Must be consistent with stepper motor hardware */
 uint32_t c_steps_per_revolution = 1600;
-uint32_t c_inhale_speed_dps = 180;
+uint32_t c_inhale_speed_dps = 600;
 
 double c_angle_at_zero = 175.0;
 double c_position_at_zero = 37.9251;

@@ -42,7 +42,7 @@ cmv is_running spontaneous_in spontaneous_ex = local (subcycle_time_remaining is
         else if t_goal_reached >= 200000
               -- Then pull back all the way, even if the cycle doesn't say we should
                -- exhale yet.
-        then -170
+        then - (unsafeCast Controls.inhale_speed_dps)
         else unsafeCast Controls.inhale_speed_dps
         
         -- Here we use a coarse estimate. It takes roughly 90 degrees to
@@ -70,7 +70,7 @@ cmv is_running spontaneous_in spontaneous_ex = local (subcycle_time_remaining is
         -- Always retract at a rate that would get us back to 0 in time, at
         -- the shortest exhale duration (60Hz, 1:1 ratio, meaning we have half
         -- a second to traverse the roughly 90 degrees).
-        else -170
+        else - (unsafeCast Controls.inhale_speed_dps)
 
     else 0
 
